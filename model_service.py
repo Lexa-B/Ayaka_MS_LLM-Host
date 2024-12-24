@@ -45,7 +45,7 @@ class ModelService:
             handler_module = importlib.import_module(handler_module_name)
             handler_class = getattr(handler_module, "ModelHandler")
         except (ImportError, AttributeError) as e:
-            DramaticLogger["Dramatic"]["error"](f"[ModelService] Could not find a handler for model '{params.model}': {e}")
+            DramaticLogger["Dramatic"]["error"](f"[ModelService] Could not find a handler for model '{params.model}':", f"Please ensure it is supported byt the LLM-Host. Error: {e}")
             raise ValueError(f"Unsupported model or missing handler file: {params.model}")
 
         self.current_handler = handler_class(params)
@@ -57,6 +57,7 @@ class ModelService:
         Generate text from the loaded model using the current handler.
         """
         if not self.model_initialized or not self.current_handler:
+            DramaticLogger["Dramatic"]["error"](f"[ModelService] Model not initialized. Call /initialize first.")
             raise ValueError("Model not initialized. Call /initialize first.")
 
         input_ids = self.current_handler.prepare_input(messages)
@@ -79,6 +80,7 @@ class ModelService:
         Stream the response token by token from the loaded model.
         """
         if not self.model_initialized or not self.current_handler:
+            DramaticLogger["Dramatic"]["error"](f"[ModelService] Model not initialized. Call /initialize first.")
             raise ValueError("Model not initialized. Call /initialize first.")
 
         return self.current_handler.stream_output(messages)

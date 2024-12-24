@@ -18,16 +18,26 @@ class BaseModelHandler:
         self.params = params
         self.model = None
         self.tokenizer = None
-        # Let subclasses define or override build_model_path()
-        self.model_path = self.build_model_path()
 
-        # If a seed is provided, fix it for reproducibility
-        if self.params.seed is not None:
-            torch.manual_seed(self.params.seed)
+        try:
+            # Let subclasses define or override build_model_path()
+            self.model_path = self.build_model_path()
 
-        # Load the model and tokenizer
-        self.load_model()  
-        DramaticLogger["Normal"]["info"](f"[BaseModelHandler] init done. Model path: {self.model_path}")
+            # If a seed is provided, fix it for reproducibility
+            if self.params.seed is not None:
+                torch.manual_seed(self.params.seed)
+
+            # Load the model and tokenizer
+            self.load_model()  
+            DramaticLogger["Normal"]["info"](
+                f"[BaseModelHandler] init done. Model path: {self.model_path}"
+            )
+        except Exception as e:
+            DramaticLogger["Error"]["error"](
+                f"[BaseModelHandler] __init__ encountered an error: {str(e)}", 
+                exc_info=True
+            )
+            raise e
 
     def build_model_path(self) -> str:
         """
