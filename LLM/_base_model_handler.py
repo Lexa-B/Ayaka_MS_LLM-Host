@@ -243,21 +243,34 @@ class BaseModelHandler:
     #  TERMINATORS
     # ----------------------------------------------------------------
     def get_terminators(self) -> List[int]:
-        terminators = [self.tokenizer.eos_token_id]
-        for possible in ["<|eot_id|>", "<|im_end|>", "</s>"]:
-            tok_id = self.safe_token_id(possible)
-            if tok_id is not None:
-                terminators.append(tok_id)
-        return list(set(terminators))
+        try:
+            terminators = [self.tokenizer.eos_token_id]
+            for possible in ["<|eot_id|>", "<|im_end|>", "</s>"]:
+                tok_id = self.safe_token_id(possible)
+                if tok_id is not None:
+                    terminators.append(tok_id)
+            return list(set(terminators))
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] get_terminators() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
 
     def safe_token_id(self, token_str: str):
-        if token_str in self.tokenizer.vocab:
-            return self.tokenizer.vocab[token_str]
         try:
+            if token_str in self.tokenizer.vocab:
+                return self.tokenizer.vocab[token_str]
             return self.tokenizer.convert_tokens_to_ids(token_str)
-        except:
+        except Exception as e:
+            # If an exception occurs (token not found or something else),
+            # just log it and return None rather than failing everything.
+            DramaticLogger["Normal"]["warning"](
+                f"[BaseModelHandler] safe_token_id() could not retrieve ID for '{token_str}': {str(e)}"
+            )
             return None
-
+        
     # ----------------------------------------------------------------
     #  STREAMING
     # ----------------------------------------------------------------
