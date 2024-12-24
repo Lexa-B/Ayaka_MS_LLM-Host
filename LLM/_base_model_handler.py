@@ -5,7 +5,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from typing import List, Dict
 import asyncio
 from fastapi.responses import StreamingResponse
-from loguru import logger
+from dramatic_logger import DramaticLogger
 
 class BaseModelHandler:
     """
@@ -27,7 +27,7 @@ class BaseModelHandler:
 
         # Load the model and tokenizer
         self.load_model()  
-        logger.info(f"[BaseModelHandler] init done. Model path: {self.model_path}")
+        DramaticLogger["Normal"]["info"](f"[BaseModelHandler] init done. Model path: {self.model_path}")
 
     def build_model_path(self) -> str:
         """
@@ -35,7 +35,7 @@ class BaseModelHandler:
         Subclasses typically override this method or define a constant 
         to specify their custom path, e.g. ./LLM/Mistralai/Mistral-7B.
         """
-        logger.warning("No explicit build_model_path() override found; using default.")
+        DramaticLogger["Warning"]["warning"]("[BaseModelHandler] No explicit build_model_path() override found; using default.")
         return f"./LLM/{self.params.model}"
 
     def load_model(self):
@@ -69,15 +69,16 @@ class BaseModelHandler:
 """
 
         if torch.cuda.is_available():
-            logger.info("GPU is available. Moving model to GPU.")
+            DramaticLogger["Normal"]["debug"]("[BaseModelHandler] GPU is available. Moving model to GPU.")
             self.model.to("cuda")
 
-        logger.info("[BaseModelHandler] Default load_model() done.")
+        DramaticLogger["Normal"]["info"]("[BaseModelHandler] Default load_model() done.")
 
     # ----------------------------------------------------------------
     #  PREPROCESS
     # ----------------------------------------------------------------
     def preprocess_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        DramaticLogger["Dramatic"]["info"]("[BaseModelHandler] Preprocessing messages:", messages)
         return messages  # By default, no special transformation
 
     # ----------------------------------------------------------------
@@ -96,6 +97,7 @@ class BaseModelHandler:
     def prepare_input(self, messages: List[Dict[str, str]]):
         processed_msgs = self.preprocess_messages(messages)
         input_ids = self.apply_chat_template(processed_msgs)
+        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Input IDs:", self.tokenizer.decode(input_ids[0]))
         return input_ids
 
     # ----------------------------------------------------------------
@@ -118,10 +120,12 @@ class BaseModelHandler:
     #  DECODE
     # ----------------------------------------------------------------
     def decode_output(self, outputs, prompt_len: int):
-        return self.tokenizer.decode(
+        DecodedOutput = self.tokenizer.decode(
             outputs[0][prompt_len:],
             skip_special_tokens=True
         )
+        DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Decoded output:", DecodedOutput)
+        return DecodedOutput
 
     # ----------------------------------------------------------------
     #  POSTPROCESS
@@ -129,6 +133,7 @@ class BaseModelHandler:
     def postprocess_output(self, text: str) -> str:
         if text.endswith("</s>"):
             text = text[:-4]
+        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Postprocessed output:", text)
         return text
 
     # ----------------------------------------------------------------
@@ -183,6 +188,8 @@ class BaseModelHandler:
                     if first_chunk:
                         first_chunk = False
                         continue
+
+                    DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Streaming output:", text)
 
                     # remove trailing </s> if any
                     txt = text.rstrip("</s>")

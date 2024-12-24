@@ -2,7 +2,7 @@
 
 from LLM._base_model_handler import BaseModelHandler
 from typing import List, Dict
-from loguru import logger
+from dramatic_logger import DramaticLogger
 
 ## ===========================================-----------============================================
 ## ------------------------------------------- CONSTANTS -------------------------------------------
@@ -57,4 +57,4 @@ class ModelHandler(BaseModelHandler):
 {% endfor %}
 </s>
 """
-        logger.info("[Mistral Handler] Loaded Mistral model with custom template.")
+        DramaticLogger["Normal"]["debug"](f"[Mistral Handler] Loaded Mistral model with custom template.")

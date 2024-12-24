@@ -2,7 +2,7 @@
 
 import importlib
 from typing import List, Dict
-from loguru import logger
+from dramatic_logger import DramaticLogger
 import torch
 
 # We'll define a class to store parameters:
@@ -45,12 +45,12 @@ class ModelService:
             handler_module = importlib.import_module(handler_module_name)
             handler_class = getattr(handler_module, "ModelHandler")
         except (ImportError, AttributeError) as e:
-            logger.error(f"Could not find a handler for model '{params.model}': {e}")
+            DramaticLogger["Dramatic"]["error"](f"[ModelService] Could not find a handler for model '{params.model}': {e}")
             raise ValueError(f"Unsupported model or missing handler file: {params.model}")
 
         self.current_handler = handler_class(params)
         self.model_initialized = True
-        logger.info(f"Model '{params.model}' initialized successfully.")
+        DramaticLogger["Normal"]["success"](f"[ModelService] Model '{params.model}' initialized successfully.")
 
     def generate_response(self, messages: List[Dict[str, str]]) -> str:
         """
@@ -63,12 +63,10 @@ class ModelService:
 
         # If a GPU is available, move the input tokens to GPU
         if torch.cuda.is_available():
-            logger.info("GPU is available. Moving input tokens to GPU.")
             input_ids = input_ids.to("cuda")
 
         # Generate output
         outputs = self.current_handler.generate(input_ids)
-        logger.info(f"Outputs: {outputs}")
 
         # Decode
         output_text = self.current_handler.decode_output(outputs, input_ids.shape[-1])
