@@ -30,11 +30,12 @@ class BaseModelHandler:
             # Load the model and tokenizer
             self.load_model()  
             DramaticLogger["Normal"]["info"](
-                f"[BaseModelHandler] init done. Model path: {self.model_path}"
+                f"[BaseModelHandler] init done. Model path:", self.model_path
             )
         except Exception as e:
-            DramaticLogger["Error"]["error"](
-                f"[BaseModelHandler] __init__ encountered an error: {str(e)}", 
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] __init__ encountered an error:", 
+                str(e), 
                 exc_info=True
             )
             raise e
@@ -44,9 +45,19 @@ class BaseModelHandler:
         By default, returns a fallback path (if a subclass does not override).
         Subclasses typically override this method or define a constant 
         to specify their custom path, e.g. ./LLM/Mistralai/Mistral-7B.
-        """
-        DramaticLogger["Warning"]["warning"]("[BaseModelHandler] No explicit build_model_path() override found; using default.")
-        return f"./LLM/{self.params.model}"
+        """    
+        try:
+            DramaticLogger["Dramatic"]["warning"](
+                "[BaseModelHandler] No explicit build_model_path() override found; using default."
+            )
+            return f"./LLM/{self.params.model}"
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] build_model_path() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e    
 
     def load_model(self):
         """
@@ -56,163 +67,278 @@ class BaseModelHandler:
           - Possibly set a default chat_template
         Subclasses can override if there's something truly unique.
         """
-        quant_config = BitsAndBytesConfig(
-            load_in_4bit=self.params.quant_4bit,
-            bnb_4bit_quant_type=self.params.quant_type,
-            bnb_4bit_compute_dtype=getattr(torch, self.params.quant_dtype)
-        )
+        try:
+            quant_config = BitsAndBytesConfig(
+                load_in_4bit=self.params.quant_4bit,
+                bnb_4bit_quant_type=self.params.quant_type,
+                bnb_4bit_compute_dtype=getattr(torch, self.params.quant_dtype)
+            )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, local_files_only=True)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_path,
-            quantization_config=quant_config,
-            local_files_only=True
-        )
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_path, local_files_only=True
+            )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_path,
+                quantization_config=quant_config,
+                local_files_only=True
+            )
 
-        # If no chat_template is defined, set a fallback
-        if not hasattr(self.tokenizer, "chat_template") or self.tokenizer.chat_template is None:
-            self.tokenizer.chat_template = """{% for message in messages %}
-{% if message['role'] == 'user' %}User: {{ message['content'] }}\n
-{% elif message['role'] == 'assistant' %}Assistant: {{ message['content'] }}\n
-{% endif %}
-{% endfor %}
-"""
+            # If no chat_template is defined, set a fallback
+            if not hasattr(self.tokenizer, "chat_template") or self.tokenizer.chat_template is None:
+                self.tokenizer.chat_template = """{% for message in messages %}
+                {% if message['role'] == 'user' %}User: {{ message['content'] }}\n
+                {% elif message['role'] == 'assistant' %}Assistant: {{ message['content'] }}\n
+                {% endif %}
+                {% endfor %}
+                """
 
-        if torch.cuda.is_available():
-            DramaticLogger["Normal"]["debug"]("[BaseModelHandler] GPU is available. Moving model to GPU.")
-            self.model.to("cuda")
+            if torch.cuda.is_available():
+                DramaticLogger["Normal"]["debug"](
+                    "[BaseModelHandler] GPU is available. Moving model to GPU."
+                )
+                self.model.to("cuda")
 
-        DramaticLogger["Normal"]["info"]("[BaseModelHandler] Default load_model() done.")
+            DramaticLogger["Normal"]["info"](
+                "[BaseModelHandler] Default load_model() done."
+            )
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] load_model() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e        
 
     # ----------------------------------------------------------------
     #  PREPROCESS
     # ----------------------------------------------------------------
     def preprocess_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        DramaticLogger["Dramatic"]["info"]("[BaseModelHandler] Preprocessing messages:", messages)
-        return messages  # By default, no special transformation
-
+        try:
+            DramaticLogger["Dramatic"]["info"](
+                "[BaseModelHandler] Preprocessing messages:", messages
+            )
+            return messages  # By default, no special transformation
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] preprocess_messages() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  APPLY CHAT TEMPLATE
     # ----------------------------------------------------------------
     def apply_chat_template(self, messages: List[Dict[str, str]]):
         DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Recieved message:", messages)
-        return self.tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            return_tensors="pt"
-        )
-
+        try:
+            return self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                return_tensors="pt"
+            )
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] apply_chat_template() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  PREPARE INPUT
     # ----------------------------------------------------------------
     def prepare_input(self, messages: List[Dict[str, str]]):
-        processed_msgs = self.preprocess_messages(messages)
-        input_ids = self.apply_chat_template(processed_msgs)
-        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Input IDs:", self.tokenizer.decode(input_ids[0]))
-        return input_ids
-
+        try:
+            processed_msgs = self.preprocess_messages(messages)
+            input_ids = self.apply_chat_template(processed_msgs)
+            DramaticLogger["Dramatic"]["debug"](
+                "[BaseModelHandler] Input IDs:", self.tokenizer.decode(input_ids[0])
+            )
+            try:
+                tensor_info = f"Shape: {input_ids.shape}, Device: {input_ids.device}, Type: {input_ids.dtype}"
+                DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Input IDs:", tensor_info)
+            except Exception as e:
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Could not log tensor details:", str(e))            
+            return input_ids
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] prepare_input() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  GENERATE
     # ----------------------------------------------------------------
     def generate(self, input_ids):
-        gen_kwargs = {
-            "max_length": input_ids.shape[1] + self.params.max_tokens,
-            "temperature": self.params.temperature,
-            "top_k": self.params.top_k,
-            "top_p": self.params.top_p,
-            "do_sample": True,
-            "eos_token_id": self.get_terminators(),
-            "pad_token_id": self.tokenizer.eos_token_id
-        }
-        outputs = self.model.generate(input_ids, **gen_kwargs)
-        return outputs
-
+        try:
+            gen_kwargs = {
+                "max_length": input_ids.shape[1] + self.params.max_tokens,
+                "temperature": self.params.temperature,
+                "top_k": self.params.top_k,
+                "top_p": self.params.top_p,
+                "do_sample": True,
+                "eos_token_id": self.get_terminators(),
+                "pad_token_id": self.tokenizer.eos_token_id
+            }
+            outputs = self.model.generate(input_ids, **gen_kwargs)
+            # Safely log the tensor information
+            try:
+                tensor_info = f"Shape: {outputs.shape}, Device: {outputs.device}, Type: {outputs.dtype}"
+                DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Generated outputs:", tensor_info)
+            except Exception as e:
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Could not log tensor details:", str(e))
+            return outputs
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] generate() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  DECODE
     # ----------------------------------------------------------------
     def decode_output(self, outputs, prompt_len: int):
-        DecodedOutput = self.tokenizer.decode(
-            outputs[0][prompt_len:],
-            skip_special_tokens=True
-        )
-        DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Decoded output:", DecodedOutput)
-        return DecodedOutput
-
+        try:
+            DecodedOutput = self.tokenizer.decode(
+                outputs[0][prompt_len:],
+                skip_special_tokens=True
+            )
+            DramaticLogger["Dramatic"]["trace"](
+                "[BaseModelHandler] Decoded output:", DecodedOutput
+            )
+            return DecodedOutput
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] decode_output() encountered an error:",
+                  str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  POSTPROCESS
     # ----------------------------------------------------------------
     def postprocess_output(self, text: str) -> str:
-        if text.endswith("</s>"):
-            text = text[:-4]
-        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Postprocessed output:", text)
-        return text
-
+        try:
+            if text.endswith("</s>"):
+                text = text[:-4]
+            DramaticLogger["Dramatic"]["debug"](
+                "[BaseModelHandler] Postprocessed output:", text
+            )
+            return text
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] postprocess_output() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  TERMINATORS
     # ----------------------------------------------------------------
     def get_terminators(self) -> List[int]:
-        terminators = [self.tokenizer.eos_token_id]
-        for possible in ["<|eot_id|>", "<|im_end|>", "</s>"]:
-            tok_id = self.safe_token_id(possible)
-            if tok_id is not None:
-                terminators.append(tok_id)
-        return list(set(terminators))
+        try:
+            terminators = [self.tokenizer.eos_token_id]
+            for possible in ["<|eot_id|>", "<|im_end|>", "</s>"]:
+                tok_id = self.safe_token_id(possible)
+                if tok_id is not None:
+                    terminators.append(tok_id)
+            return list(set(terminators))
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] get_terminators() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
 
     def safe_token_id(self, token_str: str):
-        if token_str in self.tokenizer.vocab:
-            return self.tokenizer.vocab[token_str]
         try:
+            if token_str in self.tokenizer.vocab:
+                return self.tokenizer.vocab[token_str]
             return self.tokenizer.convert_tokens_to_ids(token_str)
-        except:
+        except Exception as e:
+            # If an exception occurs (token not found or something else),
+            # just log it and return None rather than failing everything.
+            DramaticLogger["Normal"]["warning"](
+                f"[BaseModelHandler] safe_token_id() could not retrieve ID for '{token_str}': {str(e)}"
+            )
             return None
-
+        
     # ----------------------------------------------------------------
     #  STREAMING
     # ----------------------------------------------------------------
     def stream_output(self, messages: List[Dict[str, str]]):
-        input_ids = self.prepare_input(messages)
-        if torch.cuda.is_available():
-            input_ids = input_ids.to("cuda")
+        try:
+            input_ids = self.prepare_input(messages)
+            if torch.cuda.is_available():
+                input_ids = input_ids.to("cuda")
 
-        streamer = self.get_streamer()
-        gen_kwargs = {
-            "max_length": input_ids.shape[1] + self.params.max_tokens,
-            "temperature": self.params.temperature,
-            "top_k": self.params.top_k,
-            "top_p": self.params.top_p,
-            "do_sample": True,
-            "eos_token_id": self.get_terminators(),
-            "pad_token_id": self.tokenizer.eos_token_id,
-            "streamer": streamer
-        }
+            streamer = self.get_streamer()
+            gen_kwargs = {
+                "max_length": input_ids.shape[1] + self.params.max_tokens,
+                "temperature": self.params.temperature,
+                "top_k": self.params.top_k,
+                "top_p": self.params.top_p,
+                "do_sample": True,
+                "eos_token_id": self.get_terminators(),
+                "pad_token_id": self.tokenizer.eos_token_id,
+                "streamer": streamer
+            }
 
-        import threading
-        thread = threading.Thread(target=self.model.generate, kwargs=dict(input_ids=input_ids, **gen_kwargs))
-        thread.daemon = True
-        thread.start()
+            import threading
+            thread = threading.Thread(
+                target=self.model.generate,
+                kwargs=dict(input_ids=input_ids, **gen_kwargs)
+            )
+            thread.daemon = True
+            thread.start()
 
-        async def token_generator():
-            first_chunk = True
-            try:
-                for text in streamer:
-                    # skip the first chunk if it's the prompt
-                    if first_chunk:
-                        first_chunk = False
-                        continue
+            async def token_generator():
+                first_chunk = True
+                try:
+                    for text in streamer:
+                        # skip the first chunk if it's the prompt
+                        if first_chunk:
+                            first_chunk = False
+                            continue
 
-                    DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Streaming output:", text)
+                        DramaticLogger["Normal"]["debug"](
+                            "[BaseModelHandler] Streaming output:", text
+                        )
 
-                    # remove trailing </s> if any
-                    txt = text.rstrip("</s>")
-                    if txt:
-                        yield txt
-                        await asyncio.sleep(0)
-            finally:
-                streamer.end()
-                if thread.is_alive():
-                    thread.join(timeout=1.0)
+                        # remove trailing </s> if any
+                        txt = text.rstrip("</s>")
+                        if txt:
+                            yield txt
+                            await asyncio.sleep(0)
+                finally:
+                    streamer.end()
+                    if thread.is_alive():
+                        thread.join(timeout=1.0)
 
-        return StreamingResponse(token_generator(), media_type="text/event-stream")
-
+            return StreamingResponse(token_generator(), media_type="text/event-stream")
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] stream_output() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     def get_streamer(self):
-        return TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
+        try:
+            return TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] get_streamer() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
