@@ -113,20 +113,38 @@ class BaseModelHandler:
     #  PREPROCESS
     # ----------------------------------------------------------------
     def preprocess_messages(self, messages: List[Dict[str, str]]) -> List[Dict[str, str]]:
-        DramaticLogger["Dramatic"]["info"]("[BaseModelHandler] Preprocessing messages:", messages)
-        return messages  # By default, no special transformation
-
+        try:
+            DramaticLogger["Dramatic"]["info"](
+                "[BaseModelHandler] Preprocessing messages:", messages
+            )
+            return messages  # By default, no special transformation
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] preprocess_messages() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  APPLY CHAT TEMPLATE
     # ----------------------------------------------------------------
     def apply_chat_template(self, messages: List[Dict[str, str]]):
         DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Recieved message:", messages)
-        return self.tokenizer.apply_chat_template(
-            messages,
-            add_generation_prompt=True,
-            return_tensors="pt"
-        )
-
+        try:
+            return self.tokenizer.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                return_tensors="pt"
+            )
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] apply_chat_template() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  PREPARE INPUT
     # ----------------------------------------------------------------
