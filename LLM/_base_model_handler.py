@@ -191,6 +191,7 @@ class BaseModelHandler:
                     "eos_token_id": self.get_terminators(),                    # Use terminators
                     "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
                 }   
+            
             outputs = self.model.generate(input_ids, **gen_kwargs)
             # Safely log the tensor information
             try:
