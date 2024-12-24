@@ -30,11 +30,12 @@ class BaseModelHandler:
             # Load the model and tokenizer
             self.load_model()  
             DramaticLogger["Normal"]["info"](
-                f"[BaseModelHandler] init done. Model path: {self.model_path}"
+                f"[BaseModelHandler] init done. Model path:", self.model_path
             )
         except Exception as e:
-            DramaticLogger["Error"]["error"](
-                f"[BaseModelHandler] __init__ encountered an error: {str(e)}", 
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] __init__ encountered an error:", 
+                str(e), 
                 exc_info=True
             )
             raise e
@@ -44,9 +45,19 @@ class BaseModelHandler:
         By default, returns a fallback path (if a subclass does not override).
         Subclasses typically override this method or define a constant 
         to specify their custom path, e.g. ./LLM/Mistralai/Mistral-7B.
-        """
-        DramaticLogger["Warning"]["warning"]("[BaseModelHandler] No explicit build_model_path() override found; using default.")
-        return f"./LLM/{self.params.model}"
+        """    
+        try:
+            DramaticLogger["Dramatic"]["warning"](
+                "[BaseModelHandler] No explicit build_model_path() override found; using default."
+            )
+            return f"./LLM/{self.params.model}"
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] build_model_path() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e    
 
     def load_model(self):
         """
