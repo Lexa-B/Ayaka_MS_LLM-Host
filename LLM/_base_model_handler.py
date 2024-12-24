@@ -155,6 +155,11 @@ class BaseModelHandler:
             DramaticLogger["Dramatic"]["debug"](
                 "[BaseModelHandler] Input IDs:", self.tokenizer.decode(input_ids[0])
             )
+            try:
+                tensor_info = f"Shape: {input_ids.shape}, Device: {input_ids.device}, Type: {input_ids.dtype}"
+                DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Input IDs:", tensor_info)
+            except Exception as e:
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Could not log tensor details:", str(e))            
             return input_ids
         except Exception as e:
             DramaticLogger["Dramatic"]["error"](
@@ -168,18 +173,32 @@ class BaseModelHandler:
     #  GENERATE
     # ----------------------------------------------------------------
     def generate(self, input_ids):
-        gen_kwargs = {
-            "max_length": input_ids.shape[1] + self.params.max_tokens,
-            "temperature": self.params.temperature,
-            "top_k": self.params.top_k,
-            "top_p": self.params.top_p,
-            "do_sample": True,
-            "eos_token_id": self.get_terminators(),
-            "pad_token_id": self.tokenizer.eos_token_id
-        }
-        outputs = self.model.generate(input_ids, **gen_kwargs)
-        return outputs
-
+        try:
+            gen_kwargs = {
+                "max_length": input_ids.shape[1] + self.params.max_tokens,
+                "temperature": self.params.temperature,
+                "top_k": self.params.top_k,
+                "top_p": self.params.top_p,
+                "do_sample": True,
+                "eos_token_id": self.get_terminators(),
+                "pad_token_id": self.tokenizer.eos_token_id
+            }
+            outputs = self.model.generate(input_ids, **gen_kwargs)
+            # Safely log the tensor information
+            try:
+                tensor_info = f"Shape: {outputs.shape}, Device: {outputs.device}, Type: {outputs.dtype}"
+                DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Generated outputs:", tensor_info)
+            except Exception as e:
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Could not log tensor details:", str(e))
+            return outputs
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] generate() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  DECODE
     # ----------------------------------------------------------------
