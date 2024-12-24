@@ -275,49 +275,70 @@ class BaseModelHandler:
     #  STREAMING
     # ----------------------------------------------------------------
     def stream_output(self, messages: List[Dict[str, str]]):
-        input_ids = self.prepare_input(messages)
-        if torch.cuda.is_available():
-            input_ids = input_ids.to("cuda")
+        try:
+            input_ids = self.prepare_input(messages)
+            if torch.cuda.is_available():
+                input_ids = input_ids.to("cuda")
 
-        streamer = self.get_streamer()
-        gen_kwargs = {
-            "max_length": input_ids.shape[1] + self.params.max_tokens,
-            "temperature": self.params.temperature,
-            "top_k": self.params.top_k,
-            "top_p": self.params.top_p,
-            "do_sample": True,
-            "eos_token_id": self.get_terminators(),
-            "pad_token_id": self.tokenizer.eos_token_id,
-            "streamer": streamer
-        }
+            streamer = self.get_streamer()
+            gen_kwargs = {
+                "max_length": input_ids.shape[1] + self.params.max_tokens,
+                "temperature": self.params.temperature,
+                "top_k": self.params.top_k,
+                "top_p": self.params.top_p,
+                "do_sample": True,
+                "eos_token_id": self.get_terminators(),
+                "pad_token_id": self.tokenizer.eos_token_id,
+                "streamer": streamer
+            }
 
-        import threading
-        thread = threading.Thread(target=self.model.generate, kwargs=dict(input_ids=input_ids, **gen_kwargs))
-        thread.daemon = True
-        thread.start()
+            import threading
+            thread = threading.Thread(
+                target=self.model.generate,
+                kwargs=dict(input_ids=input_ids, **gen_kwargs)
+            )
+            thread.daemon = True
+            thread.start()
 
-        async def token_generator():
-            first_chunk = True
-            try:
-                for text in streamer:
-                    # skip the first chunk if it's the prompt
-                    if first_chunk:
-                        first_chunk = False
-                        continue
+            async def token_generator():
+                first_chunk = True
+                try:
+                    for text in streamer:
+                        # skip the first chunk if it's the prompt
+                        if first_chunk:
+                            first_chunk = False
+                            continue
 
-                    DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Streaming output:", text)
+                        DramaticLogger["Normal"]["debug"](
+                            "[BaseModelHandler] Streaming output:", text
+                        )
 
-                    # remove trailing </s> if any
-                    txt = text.rstrip("</s>")
-                    if txt:
-                        yield txt
-                        await asyncio.sleep(0)
-            finally:
-                streamer.end()
-                if thread.is_alive():
-                    thread.join(timeout=1.0)
+                        # remove trailing </s> if any
+                        txt = text.rstrip("</s>")
+                        if txt:
+                            yield txt
+                            await asyncio.sleep(0)
+                finally:
+                    streamer.end()
+                    if thread.is_alive():
+                        thread.join(timeout=1.0)
 
-        return StreamingResponse(token_generator(), media_type="text/event-stream")
-
+            return StreamingResponse(token_generator(), media_type="text/event-stream")
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] stream_output() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     def get_streamer(self):
-        return TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
+        try:
+            return TextIteratorStreamer(self.tokenizer, skip_special_tokens=True)
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] get_streamer() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
