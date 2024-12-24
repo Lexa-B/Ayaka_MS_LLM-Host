@@ -8,17 +8,17 @@ import torch
 # We'll define a class to store parameters:
 class ModelParams:
     def __init__(self, request):
-        self.model = request.model
-        self.chat_ayaka_api_key = request.chat_ayaka_api_key
-        self.temperature = request.temperature
-        self.max_tokens = request.max_tokens
-        self.top_k = request.top_k
-        self.top_p = request.top_p
-        self.seed = request.seed
-        self.stop = request.stop if request.stop else []
-        self.quant_4bit = request.quant_4bit
-        self.quant_type = request.quant_type
-        self.quant_dtype = request.quant_dtype
+        self.model = request.model                            # Name of the model being used
+        self.ayaka_llm_api_key = request.ayaka_llm_api_key    # Ayaka LLM API key (stored but not used)
+        self.temperature = request.temperature                # Sampling temperature
+        self.max_tokens = request.max_tokens                  # Maximum number of tokens to generate
+        self.top_k = request.top_k                            # Top-k for next token selection
+        self.top_p = request.top_p                            # Top-p for nucleus sampling
+        self.seed = request.seed                              # Seed for deterministic results
+        self.stop = request.stop if request.stop else []      # List of stop words to truncate responses
+        self.quant_4bit = request.quant_4bit                  # Whether to use 4-bit quantization
+        self.quant_type = request.quant_type                  # Type of quantization
+        self.quant_dtype = request.quant_dtype                # Data type for quantization
 
 
 class ModelService:
