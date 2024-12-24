@@ -14,10 +14,10 @@ class BaseModelHandler:
     """
 
     def __init__(self, params):
+        DramaticLogger["Dramatic"]["debug"](f"[BaseModelHandler] Initialization called, initializing with params:", f"Model: {params.model}\nAPI Key?: {(type(params.chat_ayaka_api_key) == str and ((len(params.chat_ayaka_api_key) > 0) and (params.chat_ayaka_api_key != "string")))}\nTemperature: {params.temperature}\nMax_tokens: {params.max_tokens}\nTop_k: {params.top_k}\nTop_p: {params.top_p}\nSeed: {params.seed}\nStop: {params.stop}\nQuant_4bit: {params.quant_4bit}\nQuant_type: {params.quant_type}\nQuant_dtype: {params.quant_dtype}")
         self.params = params
         self.model = None
         self.tokenizer = None
-        
         # Let subclasses define or override build_model_path()
         self.model_path = self.build_model_path()
 
@@ -85,6 +85,7 @@ class BaseModelHandler:
     #  APPLY CHAT TEMPLATE
     # ----------------------------------------------------------------
     def apply_chat_template(self, messages: List[Dict[str, str]]):
+        DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Recieved message:", messages)
         return self.tokenizer.apply_chat_template(
             messages,
             add_generation_prompt=True,

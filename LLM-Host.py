@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict
 import asyncio
+from dramatic_logger import DramaticLogger
 
 # Import the shared model service class
 from model_service import ModelService
@@ -19,6 +20,7 @@ favicon_path = 'favicon.ico'
 
 # Initialize our model service object
 model_service = ModelService()
+DramaticLogger["Dramatic"]["info"](f"[LLM-Host] Initializing LLM-Host. Current model service status:", model_service.get_status())
 
 # =======================================
 # Pydantic Models
