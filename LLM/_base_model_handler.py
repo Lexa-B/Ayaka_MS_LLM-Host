@@ -14,7 +14,7 @@ class BaseModelHandler:
     """
 
     def __init__(self, params):
-        DramaticLogger["Dramatic"]["debug"](f"[BaseModelHandler] Initialization called, initializing with params:", f"Model: {params.model}\nAPI Key?: {(type(params.chat_ayaka_api_key) == str and ((len(params.chat_ayaka_api_key) > 0) and (params.chat_ayaka_api_key != "string")))}\nTemperature: {params.temperature}\nMax_tokens: {params.max_tokens}\nTop_k: {params.top_k}\nTop_p: {params.top_p}\nSeed: {params.seed}\nStop: {params.stop}\nQuant_4bit: {params.quant_4bit}\nQuant_type: {params.quant_type}\nQuant_dtype: {params.quant_dtype}")
+        DramaticLogger["Dramatic"]["debug"](f"[BaseModelHandler] Initialization called, initializing with params:", f"Model: {params.model}\nAPI Key?: {(type(params.ayaka_llm_api_key) == str and ((len(params.ayaka_llm_api_key) > 0) and (params.ayaka_llm_api_key != "string")))}\nTemperature: {params.temperature}\nMax_tokens: {params.max_tokens}\nTop_k: {params.top_k}\nTop_p: {params.top_p}\nSeed: {params.seed}\nStop: {params.stop}\nQuant_4bit: {params.quant_4bit}\nQuant_type: {params.quant_type}\nQuant_dtype: {params.quant_dtype}")
         self.params = params
         self.model = None
         self.tokenizer = None
@@ -174,15 +174,23 @@ class BaseModelHandler:
     # ----------------------------------------------------------------
     def generate(self, input_ids):
         try:
-            gen_kwargs = {
-                "max_length": input_ids.shape[1] + self.params.max_tokens,
-                "temperature": self.params.temperature,
-                "top_k": self.params.top_k,
-                "top_p": self.params.top_p,
-                "do_sample": True,
-                "eos_token_id": self.get_terminators(),
-                "pad_token_id": self.tokenizer.eos_token_id
-            }
+            if self.params.temperature > 0: # Only sample if not beam and temperature is greater than 0
+                gen_kwargs = {
+                    "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
+                    "temperature": self.params.temperature,                    # Temperature is the temperature
+                    "top_k": self.params.top_k,                                # Top-k is the top-k
+                    "top_p": self.params.top_p,                                # Top-p is the top-p
+                    "do_sample": True,                                         # Do sample
+                    "eos_token_id": self.get_terminators(),                    # Use terminators
+                    "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
+                }
+            else:
+                gen_kwargs = { # Not beam search and temperature is 0, do not sample, just generate
+                    "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
+                    "do_sample": False,                                        # Do not sample, no temperature, no top_k, no top_p
+                    "eos_token_id": self.get_terminators(),                    # Use terminators
+                    "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
+                }   
             outputs = self.model.generate(input_ids, **gen_kwargs)
             # Safely log the tensor information
             try:
@@ -281,16 +289,25 @@ class BaseModelHandler:
                 input_ids = input_ids.to("cuda")
 
             streamer = self.get_streamer()
-            gen_kwargs = {
-                "max_length": input_ids.shape[1] + self.params.max_tokens,
-                "temperature": self.params.temperature,
-                "top_k": self.params.top_k,
-                "top_p": self.params.top_p,
-                "do_sample": True,
-                "eos_token_id": self.get_terminators(),
-                "pad_token_id": self.tokenizer.eos_token_id,
-                "streamer": streamer
-            }
+            if self.params.temperature > 0: # Only sample if not beam and temperature is greater than 0
+                gen_kwargs = {
+                    "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
+                    "temperature": self.params.temperature,                    # Temperature is the temperature
+                    "top_k": self.params.top_k,                                # Top-k is the top-k
+                    "top_p": self.params.top_p,                                # Top-p is the top-p
+                    "do_sample": True,                                         # Do sample
+                    "eos_token_id": self.get_terminators(),                    # Use terminators
+                    "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
+                    "streamer": streamer                                       # Use the streamer
+                }
+            else:
+                gen_kwargs = { # Not beam search and temperature is 0, do not sample, just generate
+                    "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
+                    "do_sample": False,                                        # Do not sample, no temperature, no top_k, no top_p
+                    "eos_token_id": self.get_terminators(),                    # Use terminators
+                    "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
+                    "streamer": streamer                                       # Use the streamer
+                }   
 
             import threading
             thread = threading.Thread(

@@ -12,7 +12,7 @@ from model_service import ModelService
 
 # Initialize the FastAPI application
 app = FastAPI(
-    title="ChatAyaka API",
+    title="Ayaka LLM API",
     description="A local LLM microservice that serves the Ayaka LLMs. It roughly mimics the ChatNVIDIA parameters and API calls.",
     version="0.0.2",
 )
@@ -27,7 +27,7 @@ DramaticLogger["Dramatic"]["info"](f"[LLM-Host] Initializing LLM-Host. Current m
 # =======================================
 class InitializeRequest(BaseModel):
     model: str = Field(..., description="The model to use for chat.")
-    chat_ayaka_api_key: Optional[str] = Field(None, description="The ChatAyaka API key for hosted NIM.")
+    ayaka_llm_api_key: Optional[str] = Field(None, description="The Ayaka LLM API key from the requestor.")
     temperature: float = Field(0.7, ge=0.0, le=1.0, description="Sampling temperature in [0,1].")
     max_tokens: int = Field(256, description="Maximum number of tokens to generate.")
     top_k: int = Field(50, description="Top-k for next token selection.")
@@ -39,11 +39,11 @@ class InitializeRequest(BaseModel):
     quant_dtype: Optional[str] = Field("float16", description="Data type for quantization.")
 
 
-class ChatRequest(BaseModel):
+class LLMRequest(BaseModel):
     messages: List[Dict[str, str]] = Field(None, description="List of messages to send to the model.")
 
 
-class ChatResponse(BaseModel):
+class LLMResponse(BaseModel):
     response: str = Field(..., description="The model-generated response.")
 
 # =======================================
@@ -75,21 +75,21 @@ async def initialize(request: InitializeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/generate", response_model=ChatResponse, summary="Generate a response from the model")
-async def chat(request: ChatRequest):
+@app.post("/generate", response_model=LLMResponse, summary="Generate a response from the model")
+async def LLM(request: LLMRequest):
     """
     Generate a response from the language model based on user input.
     """
     try:
         output_text = model_service.generate_response(request.messages)
-        return ChatResponse(response=output_text)
+        return LLMResponse(response=output_text)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/stream")
-async def stream_chat(request: ChatRequest):
-    """Stream the chat response token by token."""
+async def stream_LLM(request: LLMRequest):
+    """Stream the LLM response token by token."""
     try:
         return model_service.stream_response(request.messages)
     except Exception as e:
