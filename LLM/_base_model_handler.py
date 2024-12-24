@@ -149,11 +149,21 @@ class BaseModelHandler:
     #  PREPARE INPUT
     # ----------------------------------------------------------------
     def prepare_input(self, messages: List[Dict[str, str]]):
-        processed_msgs = self.preprocess_messages(messages)
-        input_ids = self.apply_chat_template(processed_msgs)
-        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Input IDs:", self.tokenizer.decode(input_ids[0]))
-        return input_ids
-
+        try:
+            processed_msgs = self.preprocess_messages(messages)
+            input_ids = self.apply_chat_template(processed_msgs)
+            DramaticLogger["Dramatic"]["debug"](
+                "[BaseModelHandler] Input IDs:", self.tokenizer.decode(input_ids[0])
+            )
+            return input_ids
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] prepare_input() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  GENERATE
     # ----------------------------------------------------------------
