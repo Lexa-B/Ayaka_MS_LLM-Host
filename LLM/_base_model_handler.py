@@ -67,33 +67,47 @@ class BaseModelHandler:
           - Possibly set a default chat_template
         Subclasses can override if there's something truly unique.
         """
-        quant_config = BitsAndBytesConfig(
-            load_in_4bit=self.params.quant_4bit,
-            bnb_4bit_quant_type=self.params.quant_type,
-            bnb_4bit_compute_dtype=getattr(torch, self.params.quant_dtype)
-        )
+        try:
+            quant_config = BitsAndBytesConfig(
+                load_in_4bit=self.params.quant_4bit,
+                bnb_4bit_quant_type=self.params.quant_type,
+                bnb_4bit_compute_dtype=getattr(torch, self.params.quant_dtype)
+            )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path, local_files_only=True)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            self.model_path,
-            quantization_config=quant_config,
-            local_files_only=True
-        )
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                self.model_path, local_files_only=True
+            )
+            self.model = AutoModelForCausalLM.from_pretrained(
+                self.model_path,
+                quantization_config=quant_config,
+                local_files_only=True
+            )
 
-        # If no chat_template is defined, set a fallback
-        if not hasattr(self.tokenizer, "chat_template") or self.tokenizer.chat_template is None:
-            self.tokenizer.chat_template = """{% for message in messages %}
-{% if message['role'] == 'user' %}User: {{ message['content'] }}\n
-{% elif message['role'] == 'assistant' %}Assistant: {{ message['content'] }}\n
-{% endif %}
-{% endfor %}
-"""
+            # If no chat_template is defined, set a fallback
+            if not hasattr(self.tokenizer, "chat_template") or self.tokenizer.chat_template is None:
+                self.tokenizer.chat_template = """{% for message in messages %}
+                {% if message['role'] == 'user' %}User: {{ message['content'] }}\n
+                {% elif message['role'] == 'assistant' %}Assistant: {{ message['content'] }}\n
+                {% endif %}
+                {% endfor %}
+                """
 
-        if torch.cuda.is_available():
-            DramaticLogger["Normal"]["debug"]("[BaseModelHandler] GPU is available. Moving model to GPU.")
-            self.model.to("cuda")
+            if torch.cuda.is_available():
+                DramaticLogger["Normal"]["debug"](
+                    "[BaseModelHandler] GPU is available. Moving model to GPU."
+                )
+                self.model.to("cuda")
 
-        DramaticLogger["Normal"]["info"]("[BaseModelHandler] Default load_model() done.")
+            DramaticLogger["Normal"]["info"](
+                "[BaseModelHandler] Default load_model() done."
+            )
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] load_model() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e        
 
     # ----------------------------------------------------------------
     #  PREPROCESS
