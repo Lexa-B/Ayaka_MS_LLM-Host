@@ -1,0 +1,14 @@
+# Python
+*.pyc
+__pycache__/
+*.env
+VenvLx/
+
+# LLM files
+LLM/*/
+
+# Logs
+*.log
+
+# Docker
+*.dockerignore
