@@ -203,22 +203,42 @@ class BaseModelHandler:
     #  DECODE
     # ----------------------------------------------------------------
     def decode_output(self, outputs, prompt_len: int):
-        DecodedOutput = self.tokenizer.decode(
-            outputs[0][prompt_len:],
-            skip_special_tokens=True
-        )
-        DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Decoded output:", DecodedOutput)
-        return DecodedOutput
-
+        try:
+            DecodedOutput = self.tokenizer.decode(
+                outputs[0][prompt_len:],
+                skip_special_tokens=True
+            )
+            DramaticLogger["Dramatic"]["trace"](
+                "[BaseModelHandler] Decoded output:", DecodedOutput
+            )
+            return DecodedOutput
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] decode_output() encountered an error:",
+                  str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  POSTPROCESS
     # ----------------------------------------------------------------
     def postprocess_output(self, text: str) -> str:
-        if text.endswith("</s>"):
-            text = text[:-4]
-        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Postprocessed output:", text)
-        return text
-
+        try:
+            if text.endswith("</s>"):
+                text = text[:-4]
+            DramaticLogger["Dramatic"]["debug"](
+                "[BaseModelHandler] Postprocessed output:", text
+            )
+            return text
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"](
+                "[BaseModelHandler] postprocess_output() encountered an error:",
+                str(e),
+                exc_info=True
+            )
+            raise e
+        
     # ----------------------------------------------------------------
     #  TERMINATORS
     # ----------------------------------------------------------------
