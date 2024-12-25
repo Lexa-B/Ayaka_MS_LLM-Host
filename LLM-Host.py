@@ -26,6 +26,15 @@ DramaticLogger["Dramatic"]["info"](f"[LLM-Host] Initializing LLM-Host. Current m
 # Pydantic Models
 # =======================================
 class InitializeRequest(BaseModel):
+    # ToDo: 
+    # Learn more about text generation strategies: https://huggingface.co/docs/transformers/v4.28.1/generation_strategies
+    # Then do something like this, if I still think it's a good idea:
+    # - Enable beam search
+    #   - Make an option to enable/disable beam search
+    #   - Move all model params specicic to beam search into a dictionary
+    # - Move all model params specific to sampling into a sub-class
+    #   - This will allow us to have a base class for all models that don't need sampling
+    #   - And a dictionary key for all models that do need sampling
     model: str = Field(..., description="The model to use for chat.")
     ayaka_llm_api_key: Optional[str] = Field(None, description="The Ayaka LLM API key from the requestor.")
     temperature: float = Field(0.7, ge=0.0, le=1.0, description="Sampling temperature in [0,1].")
