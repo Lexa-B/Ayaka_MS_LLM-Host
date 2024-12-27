@@ -3,7 +3,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any, Union
 import asyncio
 from dramatic_logger import DramaticLogger
 
@@ -55,9 +55,114 @@ class LLMRequest(BaseModel):
 class LLMResponse(BaseModel):
     response: str = Field(..., description="The model-generated response.")
 
-# =======================================
-# Basic Routes
-# =======================================
+class Message(BaseModel):
+    role: str
+    content: str
+
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: List[Message]
+    # Include other parameters as per OpenAI specs
+
+class Choice(BaseModel):
+    message: Message
+    finish_reason: str
+    index: int
+
+class ChatCompletionResponse(BaseModel):
+    choices: List[Choice]
+    # Include other fields as per OpenAI specs
+
+class CompletionRequest(BaseModel):
+    model: str
+    prompt: str
+    # Include other parameters as per OpenAI specs
+
+class CompletionChoice(BaseModel):
+    text: str
+    index: int
+    logprobs: Optional[Any]
+    finish_reason: str
+
+class CompletionResponse(BaseModel):
+    choices: List[CompletionChoice]
+    # Include other fields as per OpenAI specs
+
+class EmbeddingRequest(BaseModel):
+    model: str
+    input: Union[str, List[Any]]
+    # Include other parameters as per OpenAI specs
+
+class EmbeddingData(BaseModel):
+    index: int
+    embedding: List[float]
+
+class EmbeddingResponse(BaseModel):
+    data: List[EmbeddingData]
+    # Include other fields as per OpenAI specs
+
+class Model(BaseModel):
+    id: str
+    object: str
+    created: int
+    # Include other fields as per OpenAI specs
+
+class ModelsResponse(BaseModel):
+    data: List[Model]
+
+
+## =======================================----------------=======================================
+## --------------------------------------- AUTHENTICATION ---------------------------------------
+## =======================================----------------=======================================
+
+# from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+# from fastapi import Depends
+
+# security = HTTPBearer()
+
+# async def get_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
+#     if credentials.scheme != "Bearer":
+#         raise HTTPException(status_code=401, detail="Invalid authentication scheme.")
+#     return credentials.credentials
+
+## =========================================-----------=========================================
+## ----------------------------------------- STREAMING -----------------------------------------
+## =========================================-----------=========================================
+
+# from fastapi import WebSocket
+# from fastapi.responses import StreamingResponse
+
+# @app.post("/v1/chat/completions")
+# async def chat_completions(request: ChatCompletionRequest, api_key: str = Depends(get_api_key)):
+#     # Generate response stream
+#     def generate():
+#         # Yield responses in event format
+#         pass
+#     return StreamingResponse(generate(), media_type="text/event-stream")
+
+## =======================================----------------=======================================
+## --------------------------------------- ERROR HANDLING ---------------------------------------
+## =======================================----------------=======================================
+
+# class OpenAIError(BaseModel):
+#     error: ErrorData
+
+# class ErrorData(BaseModel):
+#     message: str
+#     type: str
+#     param: Optional[str]
+#     code: Optional[str]
+
+# @app.exception_handler(RequestValidationError)
+# async def validation_exception_handler(request, exc):
+#     return JSONResponse(
+#         status_code=400,
+#         content=OpenAIError(error=ErrorData(message=str(exc), type="invalid_request_error")).dict()
+#     )
+
+## ========================================--------------========================================
+## ---------------------------------------- BASIC ROUTES ----------------------------------------
+## ========================================--------------========================================
 
 @app.get("/")
 def home():
@@ -67,12 +172,107 @@ def home():
 async def favicon():
     return FileResponse(favicon_path)
 
+## ========================================--------------========================================
+## ---------------------------------------- MODEL ROUTES ----------------------------------------
+## ========================================--------------========================================
 
 # =======================================
-# Model Routes
+# v1 Routes
 # =======================================
 
-@app.post("/initialize", summary="Initialize the model and parameters")
+@app.post("/v1/audio/") # TODO: Implement this
+async def audio():
+    """
+    Audio endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Audio endpoint not implemented")
+
+@app.post("/v1/batch/") # TODO: Implement this
+async def batch():
+    """
+    Batch endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Batch endpoint not implemented")
+
+@app.post("/v1/chat/") # TODO: Implement this
+async def chat():
+    """
+    Chat endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Chat endpoint not implemented")
+
+@app.post("/v1/chat/completions")
+async def chat_completions(request: ChatCompletionRequest): #, api_key: str = Depends(get_api_key)):
+    # Use api_key as needed
+    pass
+
+@app.post("/v1/completions")
+async def completions(request: CompletionRequest):
+    # Process the completion request
+    # Generate response using model_service
+    # Return CompletionResponse
+    pass
+
+@app.post("/v1/embeddings")
+async def embeddings(request: EmbeddingRequest):
+    # Process the embedding request
+    # Generate embeddings using model_service
+    # Return EmbeddingResponse
+    pass
+
+@app.post("/v1/files/") # TODO: Implement this
+async def files():
+    """
+    Files endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Files endpoint not implemented")
+
+@app.post("/v1/fine-tuning/") # TODO: Implement this
+async def fine_tuning():
+    """
+    Fine-tuning endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Fine-tuning endpoint not implemented")
+
+@app.post("/v1/images/") # TODO: Implement this
+async def images():
+    """
+    Images endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Images endpoint not implemented")
+
+@app.get("/v1/models")
+async def list_models():
+    # Return a list of available models
+    pass
+
+@app.post("/v1/models/") # TODO: Implement this
+async def models():
+    """
+    Models endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Models endpoint not implemented")
+
+@app.post("/v1/moderations/") # TODO: Implement this
+async def moderations():
+    """
+    Moderations endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Moderations endpoint not implemented")
+
+@app.post("/v1/uploads/") # TODO: Implement this
+async def uploads():
+    """
+    Uploads endpoint - currently not implemented
+    """
+    raise HTTPException(status_code=501, detail="Uploads endpoint not implemented")
+
+
+# =======================================
+# Old Routes
+# =======================================
+
+@app.post("/old/initialize", summary="Initialize the model and parameters")
 async def initialize(request: InitializeRequest):
     """
     Initialize the language model with the provided parameters.
@@ -84,7 +284,7 @@ async def initialize(request: InitializeRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/generate", response_model=LLMResponse, summary="Generate a response from the model")
+@app.post("/old/generate", response_model=LLMResponse, summary="Generate a response from the model")
 async def LLM(request: LLMRequest):
     """
     Generate a response from the language model based on user input.
@@ -96,7 +296,7 @@ async def LLM(request: LLMRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/stream")
+@app.post("/old/stream")
 async def stream_LLM(request: LLMRequest):
     """Stream the LLM response token by token."""
     try:
@@ -105,7 +305,7 @@ async def stream_LLM(request: LLMRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/status", summary="Check the status of the API")
+@app.get("/old/status", summary="Check the status of the API")
 async def status():
     """
     Check the current status of the API, including whether the model is initialized and its name.
