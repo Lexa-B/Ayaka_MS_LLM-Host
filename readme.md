@@ -219,7 +219,7 @@ graph TD
    │        - sets chat_template or special transforms           │
    │                                                             │
    │    + def generate_response(messages):                       │
-   │        - handle Mistral-specific role transformations       │
+   │        - handle model-specific role transformations       │
    │        - apply chat template                                │
    │        - call model.generate(...)                           │
    │        - return text                                        │
