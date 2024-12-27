@@ -271,8 +271,15 @@ async def images():
 
 @app.get("/v1/models")
 async def list_models():
-    # Return a list of available models
-    pass
+    """
+    Retrieve a list of available models following the OpenAI API specification.
+    """
+    try:
+        models = model_service.get_available_models()
+        return {"data": models}
+    except Exception as e:
+        DramaticLogger["Dramatic"]["error"]("[LLM-Host] Failed to list models:", str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve models.")
 
 @app.post("/v1/models/") # TODO: Implement this
 async def models():

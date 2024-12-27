@@ -1,9 +1,11 @@
 # model_service.py
 
 import importlib
-from typing import List, Dict
+from typing import List, Dict, Any
 from dramatic_logger import DramaticLogger
 import torch
+import os
+import pkgutil
 
 # We'll define a class to store parameters:
 class ModelParams:
@@ -94,3 +96,24 @@ class ModelService:
             "model_initialized": self.model_initialized,
             "model_name": self.model_name if self.model_initialized else "none"
         }
+
+    def get_available_models(self) -> List[Dict[str, Any]]:
+        """
+        Retrieves a list of available models with their metadata.
+        """
+        models = []
+        llm_directory = os.path.join(os.path.dirname(__file__), 'LLM')
+
+        for finder, name, ispkg in pkgutil.iter_modules([llm_directory]):
+            if name.startswith("model_srv_") and not ispkg:
+                model_id = name.replace("model_srv_", "").replace("_", "-")
+                models.append({
+                    "id": model_id,
+                    "object": "model",
+                    "created": int(os.path.getctime(llm_directory)),  # Example timestamp
+                    "owned_by": "user",  # Adjust as needed
+                    "permission": []  # Add permissions if applicable
+                })
+
+        DramaticLogger["Normal"]["info"]("[ModelService] Retrieved available models:", models)
+        return models
