@@ -294,7 +294,7 @@ The project is divided into distinct layers and files to ensure clear separation
 * LLM-Host.py: Main FastAPI server application. Defines routes for both “old” and “v1” endpoints, and handles requests/responses.
 * model_service.py: Encapsulates model initialization, generation, streaming, and retrieval of model status.
 * LLM/_base_model_handler.py: The base class that includes the generic loading and inference logic. Subclasses override or extend as needed.
-* LLM/model_srv_{model_name}.py: Model-specific handling. Provides unique chat prompts, tokenization quirks, or special logic required for that particular family of models.
+* LLM/model_srv_{model_name}.py: Model-specific handling. Provides unique chat prompts, tokenization quirks, or special logic required for that particular family of models. Each model has its own file, but multiple files with different specific configurations can be created for the same model.
 * readme.md: The primary documentation file for setting up, running, and contributing to the service.
 * dockerfile: The Dockerfile for building the Docker image.
 * Scripts/RebuildVenvLx.sh: The script for rebuilding the Python virtual environment.

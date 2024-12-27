@@ -1,7 +1,8 @@
 # LLM-Host.py
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 import asyncio
@@ -21,6 +22,33 @@ favicon_path = 'favicon.ico'
 # Initialize our model service object
 model_service = ModelService()
 DramaticLogger["Dramatic"]["info"](f"[LLM-Host] Initializing LLM-Host. Current model service status:", model_service.get_status())
+
+# Middleware to log all requests and responses
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        DramaticLogger["Normal"]["info"](f"[LLM-Host] Request: {request.method} {request.url}")
+        if request.method == "POST":
+            body = await request.body()
+            try:
+                body_str = body.decode('utf-8')
+                DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Request Body:", body_str)
+            except UnicodeDecodeError:
+                DramaticLogger["Dramatic"]["warning"]("[LLM-Host] Could not decode request body.")
+            
+            # Reassign the body so downstream can read it
+            async def receive():
+                return {"type": "http.request", "body": body, "more_body": False}
+            request = Request(scope=request.scope, receive=receive)
+        
+        if request.method == "GET": # Development debugging only; avoid logging in production. This can reveal sensitive information, particularly API keys.
+            headers = dict(request.headers)
+            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] GET Request Headers:", headers)  # Development debugging only; avoid logging in production
+        
+        response = await call_next(request)
+        DramaticLogger["Normal"]["info"](f"[LLM-Host] Response: {response.status_code}")
+        return response
+
+app.add_middleware(LoggingMiddleware)
 
 # =======================================
 # Pydantic Models
@@ -243,8 +271,15 @@ async def images():
 
 @app.get("/v1/models")
 async def list_models():
-    # Return a list of available models
-    pass
+    """
+    Retrieve a list of available models following the OpenAI API specification.
+    """
+    try:
+        models = model_service.get_available_models()
+        return {"data": models}
+    except Exception as e:
+        DramaticLogger["Dramatic"]["error"]("[LLM-Host] Failed to list models:", str(e))
+        raise HTTPException(status_code=500, detail="Failed to retrieve models.")
 
 @app.post("/v1/models/") # TODO: Implement this
 async def models():
