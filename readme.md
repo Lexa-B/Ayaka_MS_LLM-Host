@@ -48,7 +48,7 @@ project_root/
 │   ├── __init__.py
 │   ├── _base_model_handler.py
 │   ├── model_srv_mistralai_mistral_7b_instruct_v0_3.py
-│   ├── model_srv_llama_llama_3_2_3b_instruct.py
+│   ├── model_srv_meta_llama_llama_3_2_3b_instruct.py
 │   ├── ... (additional model handler files)
 │   │
 │   ├── mistralai/
