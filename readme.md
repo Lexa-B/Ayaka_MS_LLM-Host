@@ -15,6 +15,7 @@
 
 # To add a new model:
 1. Add a new handler file in the LLM/ directory
+2. Add the model to the LLM/ directory with the standard Huggingface {vendor}/{model}/* format (currently only Transformers-type models are supported)
 
 # Layout
 * LLM-Host.py - The FastAPI app
@@ -51,15 +52,21 @@ project_root/
 │   ├── ... (additional model handler files)
 │   │
 │   ├── mistralai/
-│   │   └── Mistral-7B-Instruct-v0.3/
-│   │       ├── tokenizer/
-│   │       ├── config.json
-│   │       └── ... (model files)
-│   ├── llama/
+│   │   ├── Mistral-7B-Instruct-v0.3/
+│   │   │   ├── tokenizer/
+│   │   │   ├── config.json
+│   │   │   └── ... (model files)
+│   │   │
+│   │   └── ... (additional mistalai models)
+│   │
+│   ├── meta-llama/
 │   │   └── Llama-3.2-3B-Instruct/
-│   │       ├── tokenizer/
-│   │       ├── config.json
-│   │       └── ... (model files)
+│   │   │   ├── tokenizer/
+│   │   │   ├── config.json
+│   │   │   └── ... (model files)
+│   │   │
+│   │   └── ... (additional meta-llama models)
+│   │
 │   └── ... (additional model directories)
 │
 └── Dev/
@@ -78,8 +85,8 @@ project_root/
   * Common logic can live here.
 * LLM/model_srv_{model_name}.py:
   * A model-specific file with a subclass of BaseModelHandler.
-  * Contains only the Mistral-specific code, templates, message preprocessing, tokenization quirks, etc.
-  * In the future, you can create parallel files (e.g., model_srv_llama_Llama-3B-Instruct.py, model_srv_falcon_Falcon-7B.py, etc.) for each model type.
+  * Contains only the model-specific code, templates, message preprocessing, tokenization quirks, etc.
+  * Each model contains its own handler file, and it in-turn points to the model files
 
 ### Systems Architecture Diagram
 ```mermaid
