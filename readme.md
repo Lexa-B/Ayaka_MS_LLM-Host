@@ -235,7 +235,7 @@ graph TD
 ### High-Level Project Structure Diagram
 ```
 ┌────────────────────────────┐         ┌─────────────────────────────┐
-│         main.py            │         │        model_service.py     │
+│       LLM-Host.py          │         │        model_service.py     │
 │----------------------------│         │-----------------------------│
 │ - FastAPI app definition   │         │ - Shared utilities          │
 │ - Endpoint definitions     │         │ - Model registry            │
