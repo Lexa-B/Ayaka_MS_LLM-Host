@@ -286,7 +286,7 @@ The project is divided into distinct layers and files to ensure clear separation
 
 3. LLM/_base_model_handler.py: The base class that includes the generic loading and inference logic. Subclasses override or extend as needed.
 
-4. LLM/model_srv_mistralai_mistral_7b_instruct_v0_3.py (and other model_srv_... files): Model-specific handling. Provides unique chat prompts, tokenization quirks, or special logic required for that particular family of models.
+4. LLM/model_srv_{model_name}.py: Model-specific handling. Provides unique chat prompts, tokenization quirks, or special logic required for that particular family of models.
 
 ## File Roles and Scopes
 * LLM-Host.py: Main FastAPI server application. Defines routes for both “old” and “v1” endpoints, and handles requests/responses.
