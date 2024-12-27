@@ -1,5 +1,6 @@
 # To Run: 
-* Make sure the CUDA tools and driver are installed 
+* Make sure the CUDA tools and driver are installed
+  * Only currently tested with CUDA 12.6/12.7 on RTX4070ti GPU in WSL Ubuntu 24.04lts
 
 ## To run locally:
 1. Build the venv & install the python requirements:
