@@ -321,7 +321,7 @@ Here is a more detailed view of how each file interacts and when you might add o
   - Do not embed logic unique to a single model. Place that in a model-specific file.
 
 • LLM/model_srv_{model_name}.py (Model-Specific Handlers):
-  - Each model or model family gets its own file, named according to a uniform “model_srv_...” pattern.
+  - Each model gets its own file, named according to a uniform “model_srv_...” pattern.
   - Override or extend _base_model_handler.py methods for specialized tokenization or advanced chat prompts.
   - Keep code strictly related to that model’s specifics in this file. For instance, Mistral vs. Llama might have different role definitions or templates.
 
