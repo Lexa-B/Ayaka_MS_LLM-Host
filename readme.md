@@ -60,7 +60,7 @@ project_root/
 │   │   └── ... (additional mistalai models)
 │   │
 │   ├── meta-llama/
-│   │   └── Llama-3.2-3B-Instruct/
+│   │   ├── Llama-3.2-3B-Instruct/
 │   │   │   ├── tokenizer/
 │   │   │   ├── config.json
 │   │   │   └── ... (model files)
