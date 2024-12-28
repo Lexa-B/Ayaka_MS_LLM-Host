@@ -90,7 +90,11 @@ class Message(BaseModel):
 class ChatCompletionRequest(BaseModel):
     model: str
     messages: List[Message]
-    # Include other parameters as per OpenAI specs
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 256
+    top_p: Optional[float] = 1.0
+    stream: Optional[bool] = False
+    # Include other parameters as per OpenAI specs (e.g., frequency_penalty, presence_penalty)
 
 class Choice(BaseModel):
     message: Message
@@ -230,9 +234,36 @@ async def chat():
     raise HTTPException(status_code=501, detail="Chat endpoint not implemented")
 
 @app.post("/v1/chat/completions")
-async def chat_completions(request: ChatCompletionRequest): #, api_key: str = Depends(get_api_key)):
-    # Use api_key as needed
-    pass
+async def chat_completions(request: ChatCompletionRequest):
+    # Reinitialize the model if different or not yet loaded
+    if (not model_service.model_initialized) or (model_service.model_name != request.model):
+        # Construct a minimal object matching InitializeRequest structure
+        # so that model_service.initialize_model can be used. Example:
+        init_like_obj = InitializeRequest(
+            model=request.model,
+            temperature=request.temperature,
+            max_tokens=request.max_tokens,
+            top_p=request.top_p,
+            # Provide defaults or additional fields as needed
+        )
+        model_service.initialize_model(init_like_obj)
+    
+    if request.stream:
+        # Streaming response
+        return model_service.stream_response([m.dict() for m in request.messages])
+    else:
+        # Non-streaming response
+        text_output = model_service.generate_response([m.dict() for m in request.messages])
+        # Build a basic OpenAI-style chat completion response:
+        return ChatCompletionResponse(
+            choices=[
+                Choice(
+                    index=0,
+                    message=Message(role="assistant", content=text_output),
+                    finish_reason="stop"
+                )
+            ]
+        )
 
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest):
