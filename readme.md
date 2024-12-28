@@ -114,6 +114,7 @@ classDiagram
         +generate_response(messages)
         +stream_response(messages)
         +get_status()
+        +get_available_models()
     }
     class BaseModelHandler {
         +load_model()
@@ -184,9 +185,9 @@ graph TD
                    ┌────────────────────────────┐
                    │       LLM-Host.py          │
                    │----------------------------│
-(1)  FastAPI(...) -> + app = FastAPI(...)       │
+    (1)  FastAPI(...) -> + app = FastAPI(...)   │
                    │                            │
-     + POST /v1/chat/completions                │
+       + POST /v1/chat/completions              │
                    │ │                          │
                    │ ├─POST(Streaming=False)──► calls ──► model_service.generate_response(messages)
                    │ │         │                │
@@ -194,16 +195,18 @@ graph TD
                    │ │         │                │
                    │ └─POST(Streaming=True)───► calls ──► model_service.stream_response(messages)
                    │                            │
-     + POST /v1/completions                     │
+       + POST /v1/completions                   │
                    │                            │
                    │                            │
-     + POST /v1/embeddings                      │
+       + POST /v1/embeddings                    │
                    │                            │
                    │                            │
-     + GET /v1/models                           │
+       + GET /v1/models                         │
+                   │ │                          │
+                   │ └─GET──► calls ──► model_service.get_available_models()
                    │                            │
                    │                            │
-     + Additional placeholders (/v1/audio, /v1/files, /v1/fine-tuning, etc.)
+       + Additional placeholders (/v1/audio, /v1/files, /v1/fine-tuning, etc.)
                    │                            │
                    │                            │
                    └────────────────────────────┘
@@ -232,6 +235,9 @@ graph TD
    │                                                             │
    │    + def get_status():                                      │
    │        - returns whether model is loaded, which model, etc. │
+   │                                                             │
+   │    + def get_available_models():                            │
+   │        - retrieves and formats available models             │
    └─────────────────────────────────────────────────────────────┘
 ```
 ### High-Level Project Structure Diagram
@@ -334,32 +340,54 @@ Here is a more detailed view of how each file interacts and when you might add o
 ## Explanation of All Current API Endpoints
 
 ### v1 Endpoints (OpenAI-Compatible Style, In Progress)
-1. POST /v1/chat/completions  
+1. **GET /v1/models**  
+   - **Description:** Retrieves a list of available models that can be used with this microservice.
+   - **Response Format:** Follows the OpenAI API specification, returning model metadata.
+   - **Example Response:**
+     ```json
+     {
+       "data": [
+         {
+           "id": "mistralai-mistral-7b-instruct-v0-3",
+           "object": "model",
+           "created": 1633036800,
+           "owned_by": "user",
+           "permission": []
+         },
+         {
+           "id": "llama-llama-3-2-3b-instruct",
+           "object": "model",
+           "created": 1633036800,
+           "owned_by": "user",
+           "permission": []
+         }
+       ]
+     }
+     ```
+
+2. **POST /v1/chat/completions**  
    Accepts a JSON body with messages in OpenAI-style format and returns chat completions. This endpoint can be extended to stream responses.
 
-2. POST /v1/completions  
+3. **POST /v1/completions**  
    Processes traditional single-prompt completions (similar to OpenAI’s /completions).
 
-3. POST /v1/embeddings  
+4. **POST /v1/embeddings**  
    Generates embeddings (vector representations) based on user input.
 
-4. GET /v1/models  
-   Returns a list of available models that can be used with this microservice.
-
-5. Additional placeholders (/v1/audio, /v1/files, /v1/fine-tuning, etc.)  
+5. **Additional placeholders (/v1/audio, /v1/files, /v1/fine-tuning, etc.)**  
    These endpoints are currently not implemented but are reserved for future expansion, matching OpenAI endpoints.
 
 ### Old Endpoints (Deprecated / For Reference)
-1. POST /old/initialize  
+1. **POST /old/initialize**  
    Initializes the model with the provided parameters.
 
-2. POST /old/generate  
+2. **POST /old/generate**  
    Generates a response from the current model using the provided messages.
 
-3. POST /old/stream  
+3. **POST /old/stream**  
    Streams token-by-token responses from the model.
 
-4. GET /old/status  
+4. **GET /old/status**  
    Returns status information about the currently loaded model.
 
 ### Old Endpoints to Model Service Flow Diagram
@@ -367,7 +395,7 @@ Here is a more detailed view of how each file interacts and when you might add o
                    ┌────────────────────────────┐
                    │       LLM-Host.py          │
                    │----------------------------│
-(1)  FastAPI(...) -> + app = FastAPI(...)       │
+    (1)  FastAPI(...) -> + app = FastAPI(...)   │
                    │                            │
      + /initialize ---- calls --> model_service.initialize_model(params)
                    │                            │
