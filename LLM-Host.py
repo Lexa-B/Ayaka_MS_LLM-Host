@@ -249,7 +249,6 @@ async def chat_completions(request: ChatCompletionRequest):
         model_service.initialize_model(init_like_obj)
     
     if request.stream:
-        DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Streaming response requested.")
         # Streaming response
         return model_service.stream_response(
             [m.dict() for m in request.messages],

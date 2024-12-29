@@ -288,15 +288,12 @@ class BaseModelHandler:
     # ----------------------------------------------------------------
     def stream_output(self, messages: List[Dict[str, str]], use_sse_format: bool = False):
         try:
-            DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Entering stream_output method.")
             input_ids = self.prepare_input(messages)
             if torch.cuda.is_available():
                 input_ids = input_ids.to("cuda")
-                DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Moved input_ids to CUDA.")
-    
+            
             streamer = self.get_streamer()
-            DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Obtained streamer.")
-    
+            
             if self.params.temperature > 0: # Only sample if not beam and temperature is greater than 0
                 gen_kwargs = {
                     "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
@@ -308,7 +305,6 @@ class BaseModelHandler:
                     "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
                     "streamer": streamer                                       # Use the streamer
                 }
-                DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Generated gen_kwargs for sampling.")
             else:
                 gen_kwargs = { # Not beam search and temperature is 0, do not sample, just generate
                     "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
@@ -317,8 +313,7 @@ class BaseModelHandler:
                     "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
                     "streamer": streamer                                       # Use the streamer
                 }   
-                DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Generated gen_kwargs without sampling.")
-    
+            
             import threading
             thread = threading.Thread(
                 target=self.model.generate,
@@ -326,25 +321,20 @@ class BaseModelHandler:
             )
             thread.daemon = True
             thread.start()
-            DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Started generation thread.")
-    
+        
             async def token_generator():
                 completion_id = f"cmpl-{str(uuid.uuid4())}"
                 first_chunk = True
-                DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Entering token_generator.")
                 try:
                     for text in streamer:
                         # skip the first chunk if it's the prompt
                         if first_chunk:
                             first_chunk = False
-                            DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Skipping first prompt chunk.")
                             continue
     
-                        DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Streaming output:", text)
-    
                         # remove trailing </s> if any
-                        txt = text.rstrip("</s>")
-                        DramaticLogger["Dramatic"]["debug"]("[BaseModelHandler] Text after stripping:</s>:", txt)
+                        text = text.rstrip("</s>")
+                        DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Streaming output:", text)
                         
                         # SSE format (or raw text) depending on use_sse_format
                         if use_sse_format:
@@ -356,7 +346,7 @@ class BaseModelHandler:
                                 "model": self.params.model,
                                 "choices": [
                                     {
-                                        "delta": {"content": txt},
+                                        "delta": {"content": text},
                                         "index": 0,
                                         "finish_reason": None
                                     }
@@ -365,7 +355,7 @@ class BaseModelHandler:
                             yield f"data: {json.dumps(json_payload)}\n\n"
                         else:
                             # raw text
-                            yield txt
+                            yield text
                         await asyncio.sleep(0)
                 except Exception as e:
                     DramaticLogger["Dramatic"]["error"](
@@ -378,12 +368,10 @@ class BaseModelHandler:
                     streamer.end()
                     if thread.is_alive():
                         thread.join(timeout=1.0)
-                        DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Joined generation thread.")
                     # Once everything is done, return the final [DONE] line for SSE client
                     if use_sse_format:
                         yield "data: [DONE]\n\n"
-                        DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Yielded SSE formatted [DONE].")
-
+                    
             return StreamingResponse(
                 token_generator(),
                 media_type="text/event-stream" if use_sse_format else "text/plain"
