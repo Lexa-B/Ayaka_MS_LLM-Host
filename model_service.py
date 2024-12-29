@@ -77,15 +77,16 @@ class ModelService:
 
         return output_text
 
-    def stream_response(self, messages: List[Dict[str, str]]):
+    def stream_response(self, messages: List[Dict[str, str]], use_sse_format: bool = False):
         """
         Stream the response token by token from the loaded model.
+        If use_sse_format=True, wrap each token in SSE "data: ...\n\n" format.
         """
         if not self.model_initialized or not self.current_handler:
-            DramaticLogger["Dramatic"]["error"](f"[ModelService] Model not initialized. Call /initialize first.")
+            DramaticLogger["Dramatic"]["error"]("[ModelService] Model not initialized. Call /initialize first.")
             raise ValueError("Model not initialized. Call /initialize first.")
-
-        return self.current_handler.stream_output(messages)
+        
+        return self.current_handler.stream_output(messages, use_sse_format=use_sse_format)
 
     def get_status(self):
         """
