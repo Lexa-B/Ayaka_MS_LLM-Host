@@ -17,7 +17,7 @@ class BaseModelHandler:
     """
 
     def __init__(self, params):
-        DramaticLogger["Dramatic"]["debug"](f"[BaseModelHandler] Initialization called, initializing with params:", f"Model: {params.model}\nAPI Key?: {(type(params.ayaka_llm_api_key) == str and ((len(params.ayaka_llm_api_key) > 0) and (params.ayaka_llm_api_key != "string")))}\nTemperature: {params.temperature}\nMax_tokens: {params.max_tokens}\nTop_k: {params.top_k}\nTop_p: {params.top_p}\nSeed: {params.seed}\nStop: {params.stop}\nQuant_4bit: {params.quant_4bit}\nQuant_type: {params.quant_type}\nQuant_dtype: {params.quant_dtype}")
+        DramaticLogger["Normal"]["info"](f"[BaseModelHandler] Initialization called with model:", params.model)
         self.params = params
         self.model = None
         self.tokenizer = None
@@ -32,16 +32,15 @@ class BaseModelHandler:
 
             # Load the model and tokenizer
             self.load_model()  
-            DramaticLogger["Normal"]["info"](
-                f"[BaseModelHandler] init done. Model path:", self.model_path
-            )
+            DramaticLogger["Normal"]["info"](f"[BaseModelHandler] init done. Model path:", self.model_path)
+
         except Exception as e:
-            DramaticLogger["Dramatic"]["error"](
-                "[BaseModelHandler] __init__ encountered an error:", 
-                str(e), 
-                exc_info=True
-            )
-            raise e
+            if "Model files not found" in str(e):
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Model files not found:", str(e))
+                raise ValueError(f"Model files not found for {self.params.model}")
+            else:
+                DramaticLogger["Dramatic"]["error"](f"[BaseModelHandler] Error in initialization:", str(e))
+                raise
 
     def build_model_path(self) -> str:
         """
@@ -96,21 +95,18 @@ class BaseModelHandler:
                 """
 
             if torch.cuda.is_available():
-                DramaticLogger["Normal"]["debug"](
-                    "[BaseModelHandler] GPU is available. Moving model to GPU."
-                )
+                DramaticLogger["Normal"]["debug"]("[BaseModelHandler] GPU is available. Moving model to GPU.")
                 self.model.to("cuda")
-
-            DramaticLogger["Normal"]["info"](
-                "[BaseModelHandler] Default load_model() done."
-            )
+            DramaticLogger["Normal"]["info"]("[BaseModelHandler] Default load_model() done.")
         except Exception as e:
-            DramaticLogger["Dramatic"]["error"](
-                "[BaseModelHandler] load_model() encountered an error:",
-                str(e),
-                exc_info=True
-            )
-            raise e        
+            if "Incorrect path_or_model_id: './LLM/" in str(e):
+                HubPath = str(e).split("'")[1].lstrip("./LLM/")
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Model files not found:", str(e))
+                DramaticLogger["Normal"]["info"]("[BaseModelHandler] Attempting to download model files from Hugging Face Hub:", HubPath)
+                raise ValueError(f"Model files not found for {HubPath}")
+            else:
+                DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error loading model:", f"Error: {str(e)}")
+                raise Exception(f"Failed to load model: {str(e)}")
 
     # ----------------------------------------------------------------
     #  PREPROCESS

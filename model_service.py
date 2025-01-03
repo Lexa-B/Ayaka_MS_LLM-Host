@@ -47,12 +47,23 @@ class ModelService:
             handler_module = importlib.import_module(handler_module_name)
             handler_class = getattr(handler_module, "ModelHandler")
         except (ImportError, AttributeError) as e:
-            DramaticLogger["Dramatic"]["error"](f"[ModelService] Could not find a handler for model '{params.model}':", f"Please ensure it is supported byt the LLM-Host. Error: {e}")
-            raise ValueError(f"Unsupported model or missing handler file: {params.model}")
+            DramaticLogger["Dramatic"]["error"](
+                f"[ModelService] Could not find a handler for model '{params.model}':",
+                f"Please ensure it is supported by the LLM-Host. Error: {e}"
+            )
+            raise ValueError(f"Model not available: {params.model}")
 
-        self.current_handler = handler_class(params)
-        self.model_initialized = True
-        DramaticLogger["Normal"]["success"](f"[ModelService] Model '{params.model}' initialized successfully.")
+        try:
+            self.current_handler = handler_class(params)
+            self.model_initialized = True
+            DramaticLogger["Normal"]["success"](f"[ModelService] Model '{params.model}' initialized successfully.")
+        except Exception as e:
+            if "Model files not found" in str(e):
+                DramaticLogger["Dramatic"]["warning"](f"[ModelService] Model files not found:", str(e))
+                raise ValueError(f"Model files not found for {params.model}")
+            else:
+                DramaticLogger["Dramatic"]["error"](f"[ModelService] Failed to initialize model:", str(e))
+            raise ValueError(f"Failed to initialize model: {params.model}")
 
     def generate_response(self, messages: List[Dict[str, str]]) -> str:
         """
