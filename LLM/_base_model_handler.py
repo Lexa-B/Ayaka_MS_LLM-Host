@@ -7,8 +7,13 @@ import asyncio
 import json
 import time
 import uuid
+import os
 from fastapi.responses import StreamingResponse
 from dramatic_logger import DramaticLogger
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+HF_API_Token = os.getenv('HF_API_Token')
 
 class BaseModelHandler:
     """
@@ -102,11 +107,56 @@ class BaseModelHandler:
             if "Incorrect path_or_model_id: './LLM/" in str(e):
                 HubPath = str(e).split("'")[1].lstrip("./LLM/")
                 DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Model files not found:", str(e))
-                DramaticLogger["Normal"]["info"]("[BaseModelHandler] Attempting to download model files from Hugging Face Hub:", HubPath)
+                print(f"Model path: {self.model_path}")
+                self.download_model(HubPath) # Download the missing model files from Hugging Face Hub
                 raise ValueError(f"Model files not found for {HubPath}")
             else:
                 DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error loading model:", f"Error: {str(e)}")
                 raise Exception(f"Failed to load model: {str(e)}")
+            
+    def download_model(self, model_hub_path: str):
+        if not HF_API_Token:
+            DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error getting API token:", "No HuggingFace API token found. Set the HF_API_Token environment variable.")
+            raise ValueError("No HuggingFace API token found. Set the HF_API_Token environment variable.")
+
+        try:
+            DramaticLogger["Normal"]["info"]("[BaseModelHandler] Starting model download from Hugging Face Hub:", model_hub_path)
+            # Start download in a separate thread
+            import threading
+            download_thread = threading.Thread(
+                target=self._download_model_thread,
+                args=(model_hub_path,)
+            )
+            download_thread.daemon = True
+            download_thread.start()
+            
+            # Still raise the "Model not found" error
+            raise ValueError(f"Model files not found for {model_hub_path}")
+            
+        except ValueError as ve:
+            raise ve
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error downloading model files:", f"Error: {str(e)}")
+            raise Exception(f"Failed to download model files: {str(e)}")
+
+    def _download_model_thread(self, model_hub_path: str):
+        """Helper method to handle the actual model download in a separate thread."""
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_hub_path, 
+                local_files_only=False, 
+                token=HF_API_Token
+            )
+            tokenizer = AutoTokenizer.from_pretrained(  
+                model_hub_path, 
+                local_files_only=False, 
+                token=HF_API_Token
+            )
+            model.save_pretrained(f"./LLM/{model_hub_path}")
+            tokenizer.save_pretrained(f"./LLM/{model_hub_path}")
+            DramaticLogger["Normal"]["info"]("[BaseModelHandler] Model files downloaded successfully.")
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error in download thread:", f"Error: {str(e)}")
 
     # ----------------------------------------------------------------
     #  PREPROCESS

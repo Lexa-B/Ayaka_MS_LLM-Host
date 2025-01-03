@@ -9,7 +9,7 @@
 > uvicorn LLM-Host:app --host 0.0.0.0 --port 41443 --reload
 
 ## To run in Docker:
-*Currently this often builds a **very** large image as-is, because it installs all locally downloaded LLM models and quantization occurs at runtime... just know that, without tweaking your dockerfile, this will make a large image and container, it also will take a large amount of time to do so. Test first locally, make sure everything runs great and that you don't want to change anything, then give it a go. Caveat emptor*.
+*After building, it will have to download the models from HuggingFace Hub at runtime, so it will take a while to initialize anytime a new model is requested. caveat emptor*.
 1. Build the Docker image:
 > docker build -t [[IMAGENAME]] .
 2. Run the Docker container:
