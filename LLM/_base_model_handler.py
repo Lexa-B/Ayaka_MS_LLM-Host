@@ -4,8 +4,16 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, TextIteratorStreamer
 from typing import List, Dict
 import asyncio
+import json
+import time
+import uuid
+import os
 from fastapi.responses import StreamingResponse
 from dramatic_logger import DramaticLogger
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
+HF_API_Token = os.getenv('HF_API_Token')
 
 class BaseModelHandler:
     """
@@ -14,7 +22,7 @@ class BaseModelHandler:
     """
 
     def __init__(self, params):
-        DramaticLogger["Dramatic"]["debug"](f"[BaseModelHandler] Initialization called, initializing with params:", f"Model: {params.model}\nAPI Key?: {(type(params.ayaka_llm_api_key) == str and ((len(params.ayaka_llm_api_key) > 0) and (params.ayaka_llm_api_key != "string")))}\nTemperature: {params.temperature}\nMax_tokens: {params.max_tokens}\nTop_k: {params.top_k}\nTop_p: {params.top_p}\nSeed: {params.seed}\nStop: {params.stop}\nQuant_4bit: {params.quant_4bit}\nQuant_type: {params.quant_type}\nQuant_dtype: {params.quant_dtype}")
+        DramaticLogger["Normal"]["info"](f"[BaseModelHandler] Initialization called with model:", params.model)
         self.params = params
         self.model = None
         self.tokenizer = None
@@ -29,16 +37,15 @@ class BaseModelHandler:
 
             # Load the model and tokenizer
             self.load_model()  
-            DramaticLogger["Normal"]["info"](
-                f"[BaseModelHandler] init done. Model path:", self.model_path
-            )
+            DramaticLogger["Normal"]["info"](f"[BaseModelHandler] init done. Model path:", self.model_path)
+
         except Exception as e:
-            DramaticLogger["Dramatic"]["error"](
-                "[BaseModelHandler] __init__ encountered an error:", 
-                str(e), 
-                exc_info=True
-            )
-            raise e
+            if "Model files not found" in str(e):
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Model files not found:", str(e))
+                raise ValueError(f"Model files not found for {self.params.model}")
+            else:
+                DramaticLogger["Dramatic"]["error"](f"[BaseModelHandler] Error in initialization:", str(e))
+                raise
 
     def build_model_path(self) -> str:
         """
@@ -93,21 +100,63 @@ class BaseModelHandler:
                 """
 
             if torch.cuda.is_available():
-                DramaticLogger["Normal"]["debug"](
-                    "[BaseModelHandler] GPU is available. Moving model to GPU."
-                )
+                DramaticLogger["Normal"]["debug"]("[BaseModelHandler] GPU is available. Moving model to GPU.")
                 self.model.to("cuda")
-
-            DramaticLogger["Normal"]["info"](
-                "[BaseModelHandler] Default load_model() done."
-            )
+            DramaticLogger["Normal"]["info"]("[BaseModelHandler] Default load_model() done.")
         except Exception as e:
-            DramaticLogger["Dramatic"]["error"](
-                "[BaseModelHandler] load_model() encountered an error:",
-                str(e),
-                exc_info=True
+            if "Incorrect path_or_model_id: './LLM/" in str(e):
+                HubPath = str(e).split("'")[1].lstrip("./LLM/")
+                DramaticLogger["Dramatic"]["warning"]("[BaseModelHandler] Model files not found:", str(e))
+                print(f"Model path: {self.model_path}")
+                self.download_model(HubPath) # Download the missing model files from Hugging Face Hub
+                raise ValueError(f"Model files not found for {HubPath}")
+            else:
+                DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error loading model:", f"Error: {str(e)}")
+                raise Exception(f"Failed to load model: {str(e)}")
+            
+    def download_model(self, model_hub_path: str):
+        if not HF_API_Token:
+            DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error getting API token:", "No HuggingFace API token found. Set the HF_API_Token environment variable.")
+            raise ValueError("No HuggingFace API token found. Set the HF_API_Token environment variable.")
+
+        try:
+            DramaticLogger["Normal"]["info"]("[BaseModelHandler] Starting model download from Hugging Face Hub:", model_hub_path)
+            # Start download in a separate thread
+            import threading
+            download_thread = threading.Thread(
+                target=self._download_model_thread,
+                args=(model_hub_path,)
             )
-            raise e        
+            download_thread.daemon = True
+            download_thread.start()
+            
+            # Still raise the "Model not found" error
+            raise ValueError(f"Model files not found for {model_hub_path}")
+            
+        except ValueError as ve:
+            raise ve
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error downloading model files:", f"Error: {str(e)}")
+            raise Exception(f"Failed to download model files: {str(e)}")
+
+    def _download_model_thread(self, model_hub_path: str):
+        """Helper method to handle the actual model download in a separate thread."""
+        try:
+            model = AutoModelForCausalLM.from_pretrained(
+                model_hub_path, 
+                local_files_only=False, 
+                token=HF_API_Token
+            )
+            tokenizer = AutoTokenizer.from_pretrained(  
+                model_hub_path, 
+                local_files_only=False, 
+                token=HF_API_Token
+            )
+            model.save_pretrained(f"./LLM/{model_hub_path}")
+            tokenizer.save_pretrained(f"./LLM/{model_hub_path}")
+            DramaticLogger["Normal"]["info"]("[BaseModelHandler] Model files downloaded successfully.")
+        except Exception as e:
+            DramaticLogger["Dramatic"]["error"]("[BaseModelHandler] Error in download thread:", f"Error: {str(e)}")
 
     # ----------------------------------------------------------------
     #  PREPROCESS
@@ -283,13 +332,14 @@ class BaseModelHandler:
     # ----------------------------------------------------------------
     #  STREAMING
     # ----------------------------------------------------------------
-    def stream_output(self, messages: List[Dict[str, str]]):
+    def stream_output(self, messages: List[Dict[str, str]], use_sse_format: bool = False):
         try:
             input_ids = self.prepare_input(messages)
             if torch.cuda.is_available():
                 input_ids = input_ids.to("cuda")
-
+            
             streamer = self.get_streamer()
+            
             if self.params.temperature > 0: # Only sample if not beam and temperature is greater than 0
                 gen_kwargs = {
                     "max_length": input_ids.shape[1] + self.params.max_tokens, # Max length is the input length plus the max tokens
@@ -309,7 +359,7 @@ class BaseModelHandler:
                     "pad_token_id": self.tokenizer.eos_token_id,               # Pad token is the eos token
                     "streamer": streamer                                       # Use the streamer
                 }   
-
+            
             import threading
             thread = threading.Thread(
                 target=self.model.generate,
@@ -317,8 +367,9 @@ class BaseModelHandler:
             )
             thread.daemon = True
             thread.start()
-
+        
             async def token_generator():
+                completion_id = f"cmpl-{str(uuid.uuid4())}"
                 first_chunk = True
                 try:
                     for text in streamer:
@@ -326,22 +377,51 @@ class BaseModelHandler:
                         if first_chunk:
                             first_chunk = False
                             continue
-
-                        DramaticLogger["Normal"]["debug"](
-                            "[BaseModelHandler] Streaming output:", text
-                        )
-
+    
                         # remove trailing </s> if any
-                        txt = text.rstrip("</s>")
-                        if txt:
-                            yield txt
-                            await asyncio.sleep(0)
+                        text = text.rstrip("</s>")
+                        DramaticLogger["Normal"]["debug"]("[BaseModelHandler] Streaming output:", text)
+                        
+                        # SSE format (or raw text) depending on use_sse_format
+                        if use_sse_format:
+                            # Build respond in OpenAI “chat.completion.chunk” SSE style
+                            json_payload = {
+                                "id": completion_id,
+                                "object": "chat.completion.chunk",
+                                "created": int(time.time()),
+                                "model": self.params.model,
+                                "choices": [
+                                    {
+                                        "delta": {"content": text},
+                                        "index": 0,
+                                        "finish_reason": None
+                                    }
+                                ]
+                            }
+                            yield f"data: {json.dumps(json_payload)}\n\n"
+                        else:
+                            # raw text
+                            yield text
+                        await asyncio.sleep(0)
+                except Exception as e:
+                    DramaticLogger["Dramatic"]["error"](
+                        "[BaseModelHandler] Exception in token_generator:",
+                        str(e),
+                        exc_info=True
+                    )
+                    raise e
                 finally:
                     streamer.end()
                     if thread.is_alive():
                         thread.join(timeout=1.0)
-
-            return StreamingResponse(token_generator(), media_type="text/event-stream")
+                    # Once everything is done, return the final [DONE] line for SSE client
+                    if use_sse_format:
+                        yield "data: [DONE]\n\n"
+                    
+            return StreamingResponse(
+                token_generator(),
+                media_type="text/event-stream" if use_sse_format else "text/plain"
+            )
         except Exception as e:
             DramaticLogger["Dramatic"]["error"](
                 "[BaseModelHandler] stream_output() encountered an error:",

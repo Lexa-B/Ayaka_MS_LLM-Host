@@ -31,8 +31,8 @@ WORKDIR $HOME/app
 # Copy application files and set ownership to the user
 COPY --chown=user . $HOME/app
 
-# Copy model files and SSL certificates
-COPY ./llm /llm
+# Copy only the LLM directory without its subdirectories... the models are downloaded from HuggingFace Hub at runtime
+COPY --chown=user ./llm/[!.]* /llm/
 
 # Generate self-signed SSL certificates
 RUN mkdir -p $HOME/app/sec && \

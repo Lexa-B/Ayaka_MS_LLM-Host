@@ -1,6 +1,7 @@
 # LLM-Host.py
 
 from fastapi import FastAPI, HTTPException, Request
+from starlette import status
 from fastapi.responses import FileResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel, Field
@@ -22,6 +23,10 @@ favicon_path = 'favicon.ico'
 # Initialize our model service object
 model_service = ModelService()
 DramaticLogger["Dramatic"]["info"](f"[LLM-Host] Initializing LLM-Host. Current model service status:", model_service.get_status())
+
+## ========================================------------========================================
+## ---------------------------------------- MIDDLEWARE ---------------------------------------
+## ========================================------------========================================
 
 # Middleware to log all requests and responses
 class LoggingMiddleware(BaseHTTPMiddleware):
@@ -50,9 +55,10 @@ class LoggingMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(LoggingMiddleware)
 
-# =======================================
-# Pydantic Models
-# =======================================
+## ========================================-----------------========================================
+## ---------------------------------------- PYDANTIC MODELS ---------------------------------------
+## ========================================-----------------========================================
+
 class InitializeRequest(BaseModel):
     # ToDo: 
     # Learn more about text generation strategies: https://huggingface.co/docs/transformers/v4.28.1/generation_strategies
@@ -90,7 +96,11 @@ class Message(BaseModel):
 class ChatCompletionRequest(BaseModel):
     model: str
     messages: List[Message]
-    # Include other parameters as per OpenAI specs
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 256
+    top_p: Optional[float] = 1.0
+    stream: Optional[bool] = False
+    # Include other parameters as per OpenAI specs (e.g., frequency_penalty, presence_penalty)
 
 class Choice(BaseModel):
     message: Message
@@ -230,9 +240,57 @@ async def chat():
     raise HTTPException(status_code=501, detail="Chat endpoint not implemented")
 
 @app.post("/v1/chat/completions")
-async def chat_completions(request: ChatCompletionRequest): #, api_key: str = Depends(get_api_key)):
-    # Use api_key as needed
-    pass
+async def chat_completions(request: ChatCompletionRequest):
+    try:
+        # Reinitialize the model if different or not yet loaded
+        if (not model_service.model_initialized) or (model_service.model_name != request.model):
+            # Construct a minimal object matching InitializeRequest structure
+            init_like_obj = InitializeRequest(
+                model=request.model,
+                temperature=request.temperature,
+                max_tokens=request.max_tokens,
+                top_p=request.top_p,
+                # Provide defaults or additional fields as needed
+            )
+            try:
+                model_service.initialize_model(init_like_obj)
+            except ValueError as e:
+                if "Model files not found" in str(e):
+                    # Can't find the model's files. Return 503 Service Unavailable
+                    DramaticLogger["Dramatic"]["warning"]("[LLM-Host] Model files not found:", str(e))
+                    raise HTTPException(status_code=503, detail="Model files not found, downloading from HuggingFace Hub. This may take quite a while, please try again later.")
+                else:
+                    # Can't initialize the model. Return 500 Internal Server Error
+                    DramaticLogger["Dramatic"]["error"]("[LLM-Host] Error in initialize:", str(e))
+                    raise HTTPException(status_code=500, detail=str(e))
+            except Exception as e:
+                # Unexpected error. Return 500 Internal Server Error
+                DramaticLogger["Dramatic"]["error"]("[LLM-Host] Error in initialize:", str(e))
+                raise HTTPException(status_code=500, detail=str(e))
+        
+        if request.stream:
+            # Streaming response
+            return model_service.stream_response(
+                [m.dict() for m in request.messages],
+                use_sse_format=True
+            )
+        else:
+            # Non-streaming response
+            text_output = model_service.generate_response([m.dict() for m in request.messages])
+            # Build a basic OpenAI-style chat completion response:
+            return ChatCompletionResponse(
+                choices=[
+                    Choice(
+                        index=0,
+                        message=Message(role="assistant", content=text_output),
+                        finish_reason="stop"
+                    )
+                ]
+            )
+    except Exception as e:
+        # Log any unexpected errors
+        DramaticLogger["Dramatic"]["error"]("[LLM-Host] Error in chat_completions:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/v1/completions")
 async def completions(request: CompletionRequest):
@@ -315,7 +373,18 @@ async def initialize(request: InitializeRequest):
     try:
         model_service.initialize_model(request)
         return {"message": f"Model {request.model} initialized successfully."}
+    except ValueError as e:
+        if "Model files not found" in str(e):
+            # Can't find the model's files. Return 503 Service Unavailable
+            DramaticLogger["Dramatic"]["warning"]("[LLM-Host] Model files not found:", str(e))
+            raise HTTPException(status_code=503, detail="Model files not found, downloading from HuggingFace Hub. This may take quite a while, please try again later.")
+        else:
+            # Can't initialize the model. Return 500 Internal Server Error
+            DramaticLogger["Dramatic"]["error"]("[LLM-Host] Error in initialize:", str(e))
+            raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
+        # Unexpected error. Return 500 Internal Server Error
+        DramaticLogger["Dramatic"]["error"]("[LLM-Host] Error in initialize:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
 
 
