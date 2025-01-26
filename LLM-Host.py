@@ -129,6 +129,7 @@ class ChatCompletionRequest(BaseModel):
     top_p: Optional[float] = 1.0
     stream: Optional[bool] = False
     tools: Optional[List[Tool]] = None
+    
     # Include other parameters as per OpenAI specs (e.g., frequency_penalty, presence_penalty)
 
 class Choice(BaseModel):
@@ -273,6 +274,7 @@ async def chat_completions(request: ChatCompletionRequest):
     try:
         # Reinitialize the model if different or not yet loaded
         if (not model_service.model_initialized) or (model_service.model_name != request.model):
+          
             # Convert tools to dict format if they exist
             tools_dict = [tool.dict() for tool in request.tools] if request.tools else None
             
@@ -283,6 +285,7 @@ async def chat_completions(request: ChatCompletionRequest):
                 max_tokens=request.max_tokens,
                 top_p=request.top_p,
                 tools=request.tools,  # Pass tools through to initialization
+
                 # Provide defaults or additional fields as needed
             )
             try:
