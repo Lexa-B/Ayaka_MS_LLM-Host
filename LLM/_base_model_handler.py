@@ -176,7 +176,7 @@ class BaseModelHandler:
             raise e
         
     # ----------------------------------------------------------------
-    #  APPLY CHAT TEMPLATE
+    #  FORMAT TOOLS
     # ----------------------------------------------------------------
     def format_tools(self, tools) -> str:
         """Format tools into a string that can be included in the prompt."""
@@ -204,6 +204,9 @@ class BaseModelHandler:
                 tools_str += f"  - {param_name} ({param['type']}, {required}): {param['description']}\n"
         return tools_str
 
+    # ----------------------------------------------------------------
+    #  APPLY CHAT TEMPLATE
+    # ----------------------------------------------------------------
     def apply_chat_template(self, messages: List[Dict[str, str]]):
         DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Recieved message:", messages)
         try:
@@ -222,7 +225,7 @@ class BaseModelHandler:
                     # Create new system message with tools
                     messages.insert(0, {
                         'role': 'system',
-                        'content': f"You have access to the following tools. When you need to use a tool, format your response as a JSON function call like: {{\"function_call\": {{\"name\": \"tool_name\", \"arguments\": {{\"arg1\": \"value1\"}}}}}}\n{tools_str}"
+                        'content': f"You have access to the following tools. When you need to use a tool, format your response as a JSON function call like: {{\"function_call\": {{\"name\": \"tool_name\", \"arguments\": {{\"arg1\": \"value1\"}}}}}}\n{tools_str}\n Only use tools if needed, but if you do use a tool, please only write the JSON for function calls that must be run, don't include any other text or analysis. In the case that you use a tool, after the final function call JSON, add two newline characters to ensure that the final curly brace isn't trimmed.\n If you don't need to use a tool, just return the output as a normal string."
                     })
 
             return self.tokenizer.apply_chat_template(
