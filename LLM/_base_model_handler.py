@@ -178,9 +178,53 @@ class BaseModelHandler:
     # ----------------------------------------------------------------
     #  APPLY CHAT TEMPLATE
     # ----------------------------------------------------------------
+    def format_tools(self, tools) -> str:
+        """Format tools into a string that can be included in the prompt."""
+        if not tools:
+            return ""
+        
+        tools_str = "\nAvailable tools:\n"
+        for tool in tools:
+            # Handle both Tool objects and dictionaries
+            if isinstance(tool, dict):
+                func = tool['function']
+                func_name = func['name']
+                func_desc = func['description']
+                func_params = func['parameters']
+            else:
+                func = tool.function
+                func_name = func.name
+                func_desc = func.description
+                func_params = func.parameters.dict()
+            
+            tools_str += f"\n{func_name}: {func_desc}\n"
+            tools_str += "Parameters:\n"
+            for param_name, param in func_params['properties'].items():
+                required = "required" if param_name in func_params['required'] else "optional"
+                tools_str += f"  - {param_name} ({param['type']}, {required}): {param['description']}\n"
+        return tools_str
+
     def apply_chat_template(self, messages: List[Dict[str, str]]):
         DramaticLogger["Dramatic"]["trace"]("[BaseModelHandler] Recieved message:", messages)
         try:
+            # If the model has tools available, include them in the system message
+            if hasattr(self.params, 'tools') and self.params.tools:
+                tools_str = self.format_tools(self.params.tools)
+                
+                # Add or update system message with tools
+                has_system = any(msg.get('role') == 'system' for msg in messages)
+                if has_system:
+                    # Append tools to existing system message
+                    for msg in messages:
+                        if msg['role'] == 'system':
+                            msg['content'] = msg['content'] + "\n" + tools_str
+                else:
+                    # Create new system message with tools
+                    messages.insert(0, {
+                        'role': 'system',
+                        'content': f"You have access to the following tools. When you need to use a tool, format your response as a JSON function call like: {{\"function_call\": {{\"name\": \"tool_name\", \"arguments\": {{\"arg1\": \"value1\"}}}}}}\n{tools_str}"
+                    })
+
             return self.tokenizer.apply_chat_template(
                 messages,
                 add_generation_prompt=True,

@@ -21,6 +21,7 @@ class ModelParams:
         self.quant_4bit = request.quant_4bit                  # Whether to use 4-bit quantization
         self.quant_type = request.quant_type                  # Type of quantization
         self.quant_dtype = request.quant_dtype                # Data type for quantization
+        self.tools = request.tools if hasattr(request, 'tools') else None  # Add tools parameter
 
 
 class ModelService:

@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Union
 import asyncio
 from dramatic_logger import DramaticLogger
+import json
 
 # Import the shared model service class
 from model_service import ModelService
@@ -59,6 +60,24 @@ app.add_middleware(LoggingMiddleware)
 ## ---------------------------------------- PYDANTIC MODELS ---------------------------------------
 ## ========================================-----------------========================================
 
+class FunctionParameter(BaseModel):
+    description: str
+    type: str
+
+class FunctionParameters(BaseModel):
+    type: str = "object"
+    properties: Dict[str, FunctionParameter]
+    required: List[str]
+
+class Function(BaseModel):
+    name: str
+    description: str
+    parameters: FunctionParameters
+
+class Tool(BaseModel):
+    type: str = "function"
+    function: Function
+
 class InitializeRequest(BaseModel):
     # ToDo: 
     # Learn more about text generation strategies: https://huggingface.co/docs/transformers/v4.28.1/generation_strategies
@@ -80,6 +99,7 @@ class InitializeRequest(BaseModel):
     quant_4bit: Optional[bool] = Field(True, description="Whether to use 4-bit quantization.")
     quant_type: Optional[str] = Field("nf4", description="Type of quantization.")
     quant_dtype: Optional[str] = Field("float16", description="Data type for quantization.")
+    tools: Optional[List[Tool]] = Field(None, description="List of tools to use for the model.")
 
 
 class LLMRequest(BaseModel):
@@ -89,21 +109,30 @@ class LLMRequest(BaseModel):
 class LLMResponse(BaseModel):
     response: str = Field(..., description="The model-generated response.")
 
-class Message(BaseModel):
+class Message_Basic(BaseModel):
     role: str
     content: str
 
+class Message_ToolCall(BaseModel):
+    role: str
+    content: None
+    tool_calls: Optional[List[Dict[str, Any]]] = None
+
+# Create a Union type for messages
+Message_Any = Union[Message_Basic, Message_ToolCall]
+
 class ChatCompletionRequest(BaseModel):
     model: str
-    messages: List[Message]
+    messages: List[Message_Any]  # Can accept either Message_Basic or Message_ToolCall
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = 256
     top_p: Optional[float] = 1.0
     stream: Optional[bool] = False
+    tools: Optional[List[Tool]] = None
     # Include other parameters as per OpenAI specs (e.g., frequency_penalty, presence_penalty)
 
 class Choice(BaseModel):
-    message: Message
+    message: Message_Any
     finish_reason: str
     index: int
 
@@ -244,12 +273,16 @@ async def chat_completions(request: ChatCompletionRequest):
     try:
         # Reinitialize the model if different or not yet loaded
         if (not model_service.model_initialized) or (model_service.model_name != request.model):
+            # Convert tools to dict format if they exist
+            tools_dict = [tool.dict() for tool in request.tools] if request.tools else None
+            
             # Construct a minimal object matching InitializeRequest structure
             init_like_obj = InitializeRequest(
                 model=request.model,
                 temperature=request.temperature,
                 max_tokens=request.max_tokens,
                 top_p=request.top_p,
+                tools=request.tools,  # Pass tools through to initialization
                 # Provide defaults or additional fields as needed
             )
             try:
@@ -277,12 +310,51 @@ async def chat_completions(request: ChatCompletionRequest):
         else:
             # Non-streaming response
             text_output = model_service.generate_response([m.dict() for m in request.messages])
-            # Build a basic OpenAI-style chat completion response:
-            return ChatCompletionResponse(
-                choices=[
+
+            # Check if the output is a JSON object, such as a function call from the model
+            try:
+                json_output = json.loads(text_output)
+                DramaticLogger["Dramatic"]["trace"]("[LLM-Host] Parsable JSON detected from model:", json_output)
+                if json_output["function_call"]:
+                    # We have a function call
+                    DramaticLogger["Dramatic"]["info"]("[LLM-Host] Function call detected:", json_output["function_call"])
+                    try:
+                        tool_calls = [
+                            {
+                                "id": "NOT_YET_IMPLEMENTED",
+                                "type": "function",
+                                "function": {
+                                    "name": json_output["function_call"]["name"],
+                                    "arguments": json.dumps(json_output["function_call"]["arguments"])
+                                }
+                            }
+                        ]
+                        DramaticLogger["Dramatic"]["info"]("[LLM-Host] Tool calls:", tool_calls)
+                    except:
+                        tool_calls = None
+            except:
+                # We don't have parsable JSON
+                tool_calls = None
+
+            # Build the response
+            if tool_calls:
+                # Build an OpenAI-style chat completion function call response:
+                return ChatCompletionResponse(
+                    choices=[
+                        Choice(
+                            index=0,
+                            message=Message_ToolCall(role="assistant", content=None, tool_calls=tool_calls),
+                            finish_reason="tool_calls"
+                        )
+                    ]
+                )
+            else:
+                # Build a basic OpenAI-style chat completion response:
+                return ChatCompletionResponse(
+                    choices=[
                     Choice(
                         index=0,
-                        message=Message(role="assistant", content=text_output),
+                        message=Message_Basic(role="assistant", content=text_output),
                         finish_reason="stop"
                     )
                 ]
