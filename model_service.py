@@ -1,12 +1,76 @@
 # model_service.py
 
 import importlib
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dramatic_logger import DramaticLogger
 import torch
 import os
 import pkgutil
+import re
+import json
+from typing import List, Dict
+from pydantic import BaseModel
 
+## =========================================-----------=========================================
+## ----------------------------------------- FUNCTIONS -----------------------------------------
+## =========================================-----------=========================================
+def extract_function_calls(text: str) -> List[Dict]:
+    """
+    Extracts all function call requests from a given text chunk.
+
+    Args:
+        text (str): The text to search through.
+
+    Returns:
+        List[Dict]: A list of dictionaries containing function call details.
+    """
+    # Regular expression to match the function_call JSON structure
+    pattern = re.compile(
+        r'\{"function_call":\s*\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{.*?\})\s*\}\}',
+        re.DOTALL
+    )
+    
+    matches = pattern.findall(text)
+    function_calls = []
+
+    for name, args_str in matches:
+        try:
+            # Parse the arguments string into a dictionary
+            arguments = json.loads(args_str)
+            function_calls.append({
+                "name": name,
+                "arguments": arguments
+            })
+        except json.JSONDecodeError as e:
+            print(f"Failed to parse arguments for function '{name}': {e}")
+            continue  # Skip invalid JSON structures
+
+    return function_calls
+
+def process_text_chunks(chunks: List[str]) -> List[Dict]:
+    """
+    Processes a list of text chunks to extract all function call requests.
+
+    Args:
+        chunks (List[str]): The list of text chunks to process.
+
+    Returns:
+        List[Dict]: A combined list of all function calls found.
+    """
+    all_function_calls = []
+    for index, chunk in enumerate(chunks):
+        print(f"Processing chunk {index + 1}/{len(chunks)}...")
+        calls = extract_function_calls(chunk)
+        if calls:
+            print(f"  Found {len(calls)} function call(s).")
+            all_function_calls.extend(calls)
+        else:
+            print("  No function calls found.")
+    return all_function_calls
+
+## =====================================-------------------=====================================
+## ------------------------------------- CLASS DEFINITIONS -------------------------------------
+## =====================================-------------------=====================================
 # We'll define a class to store parameters:
 class ModelParams:
     def __init__(self, request):
@@ -23,12 +87,29 @@ class ModelParams:
         self.quant_dtype = request.quant_dtype                # Data type for quantization
         self.tools = request.tools if hasattr(request, 'tools') else None  # Add tools parameter
 
+class Output(BaseModel):
+    type: str
+    content: Optional[str] = None
+    tool_calls: Optional[List[Dict[str, Any]]] = None  # Make tool_calls optional
+
+    def __init__(self, **data):
+        super().__init__(**data)
 
 class ModelService:
     def __init__(self):
         self.current_handler = None  # Will hold an instance of a model-specific handler
         self.model_initialized = False
         self.model_name = None
+        self.temperature = None
+        self.max_tokens = None
+        self.top_p = None
+        self.tools = None
+        self.top_k = None
+        self.seed = None
+        self.stop = None
+        self.quant_4bit = None
+        self.quant_type = None
+        self.quant_dtype = None
 
     def initialize_model(self, request):
         """
@@ -37,6 +118,16 @@ class ModelService:
         # Convert the request to our parameter object
         params = ModelParams(request)
         self.model_name = params.model
+        self.temperature = params.temperature
+        self.max_tokens = params.max_tokens
+        self.top_p = params.top_p
+        self.tools = params.tools
+        self.top_k = params.top_k
+        self.seed = params.seed
+        self.stop = params.stop
+        self.quant_4bit = params.quant_4bit
+        self.quant_type = params.quant_type
+        self.quant_dtype = params.quant_dtype
 
         # We expect the file name to match something like "model_srv_{model_name}" 
         # but let's do a small transform: e.g. "mistralai_Mistral-7B-Instruct-v0.3" => "mistralai_mistral_7b_instruct_v0_3"
@@ -83,11 +174,35 @@ class ModelService:
         # Generate output
         outputs = self.current_handler.generate(input_ids)
 
-        # Decode
+        # Decode into a general output text object
         output_text = self.current_handler.decode_output(outputs, input_ids.shape[-1])
         output_text = self.current_handler.postprocess_output(output_text)
 
-        return output_text
+        # Evaluate if the model attempted to use a tool
+        if "{\"function_call\"" in output_text:
+            extracted_tool_calls = extract_function_calls(output_text)
+            cleaned_tool_calls = []
+            # Make sure every occurrence was parsed
+            if len(extracted_tool_calls) == output_text.count("{\"function_call\""):
+                for tool_call in extracted_tool_calls:
+                    new_tool_call = {}
+                    new_tool_call["id"] = "NOT_YET_IMPLEMENTED"
+                    new_tool_call["type"] = "function"
+                    new_tool_call["function"] = {}
+                    new_tool_call["function"]["name"] = tool_call["name"]
+                    # Convert the arguments to a JSON string, This is needed for LangChain to parse it
+                    new_tool_call["function"]["arguments"] = json.dumps(tool_call["arguments"])
+                    cleaned_tool_calls.append(new_tool_call)
+                output = Output(type="tool_call", content=None, tool_calls=cleaned_tool_calls)
+            else:
+                DramaticLogger["Dramatic"]["warning"]("[ModelService] Inconsistent number of tool calls detected in output:", f"Parsed {len(extracted_tool_calls)} tool call(s), expected {output_text.count('{\"function_call\"')}")
+                output = None
+        else:
+            output = Output(type="basic", content=output_text)
+
+        return output
+    
+
 
     def stream_response(self, messages: List[Dict[str, str]], use_sse_format: bool = False):
         """

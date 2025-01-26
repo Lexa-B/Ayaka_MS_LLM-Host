@@ -9,6 +9,7 @@ from typing import List, Optional, Dict, Any, Union
 import asyncio
 from dramatic_logger import DramaticLogger
 import json
+import re
 
 # Import the shared model service class
 from model_service import ModelService
@@ -272,9 +273,16 @@ async def chat():
 @app.post("/v1/chat/completions")
 async def chat_completions(request: ChatCompletionRequest):
     try:
-        # Reinitialize the model if different or not yet loaded
-        if (not model_service.model_initialized) or (model_service.model_name != request.model):
-          
+        # Before checking tools, check if either is None and handle that case
+        tools_changed = (request.tools is None) != (getattr(model_service, 'tools', None) is None) or \
+                       (request.tools is not None and request.tools != getattr(model_service, 'tools', None))
+
+        if (not model_service.model_initialized) or \
+           (model_service.model_name != request.model) or \
+           (request.temperature != model_service.temperature) or \
+           (request.max_tokens != model_service.max_tokens) or \
+           (request.top_p != model_service.top_p) or \
+           tools_changed:
             # Convert tools to dict format if they exist
             tools_dict = [tool.dict() for tool in request.tools] if request.tools else None
             
@@ -312,35 +320,25 @@ async def chat_completions(request: ChatCompletionRequest):
             )
         else:
             # Non-streaming response
-            text_output = model_service.generate_response([m.dict() for m in request.messages])
-
-            # Check if the output is a JSON object, such as a function call from the model
-            try:
-                json_output = json.loads(text_output)
-                DramaticLogger["Dramatic"]["trace"]("[LLM-Host] Parsable JSON detected from model:", json_output)
-                if json_output["function_call"]:
-                    # We have a function call
-                    DramaticLogger["Dramatic"]["info"]("[LLM-Host] Function call detected:", json_output["function_call"])
-                    try:
-                        tool_calls = [
-                            {
-                                "id": "NOT_YET_IMPLEMENTED",
-                                "type": "function",
-                                "function": {
-                                    "name": json_output["function_call"]["name"],
-                                    "arguments": json.dumps(json_output["function_call"]["arguments"])
-                                }
-                            }
-                        ]
-                        DramaticLogger["Dramatic"]["info"]("[LLM-Host] Tool calls:", tool_calls)
-                    except:
-                        tool_calls = None
-            except:
-                # We don't have parsable JSON
-                tool_calls = None
+            output = model_service.generate_response([m.dict() for m in request.messages])
+            text_output = output.content
+            tool_calls = output.tool_calls
+            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output type:", output.type)
+            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output content:", output.content)
+            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output tool_calls:", output.tool_calls)
 
             # Build the response
-            if tool_calls:
+            if output.type == "basic":
+                return ChatCompletionResponse(
+                    choices=[
+                        Choice(
+                            index=0,
+                            message=Message_Basic(role="assistant", content=text_output),
+                            finish_reason="stop"
+                        )
+                    ]
+                )
+            elif output.type == "tool_call":
                 # Build an OpenAI-style chat completion function call response:
                 return ChatCompletionResponse(
                     choices=[
@@ -352,16 +350,9 @@ async def chat_completions(request: ChatCompletionRequest):
                     ]
                 )
             else:
-                # Build a basic OpenAI-style chat completion response:
-                return ChatCompletionResponse(
-                    choices=[
-                    Choice(
-                        index=0,
-                        message=Message_Basic(role="assistant", content=text_output),
-                        finish_reason="stop"
-                    )
-                ]
-            )
+                # Unexpected output type
+                raise HTTPException(status_code=500, detail="Unexpected output type")
+
     except Exception as e:
         # Log any unexpected errors
         DramaticLogger["Dramatic"]["error"]("[LLM-Host] Error in chat_completions:", str(e))
