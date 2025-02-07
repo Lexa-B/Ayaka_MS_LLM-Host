@@ -17,7 +17,7 @@ from model_service import ModelService
 # Initialize the FastAPI application
 app = FastAPI(
     title="Ayaka LLM API",
-    description="A local LLM microservice that serves the Ayaka LLMs. It roughly mimics the ChatNVIDIA parameters and API calls.",
+    description="A local LLM microservice that serves the Ayaka LLMs. It roughly mimics the ChatNVIDIA's expected OpenAI API parameters and API calls.",
     version="0.0.2",
 )
 favicon_path = 'favicon.ico'
@@ -323,9 +323,9 @@ async def chat_completions(request: ChatCompletionRequest):
             output = model_service.generate_response([m.dict() for m in request.messages])
             text_output = output.content
             tool_calls = output.tool_calls
-            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output type:", output.type)
-            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output content:", output.content)
-            DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output tool_calls:", output.tool_calls)
+            # DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output type:", output.type)
+            # DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output content:", output.content)
+            # DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Output tool_calls:", output.tool_calls)
 
             # Build the response
             if output.type == "basic":

@@ -9,6 +9,9 @@ LLM/*/
 
 # Logs
 *.log
+DLog*.zip
+DLog.*zip
+DLog.*.log.zip
 
 # Docker
 *.dockerignore

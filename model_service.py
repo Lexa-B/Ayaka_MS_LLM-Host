@@ -26,7 +26,7 @@ def extract_function_calls(text: str) -> List[Dict]:
     """
     # Regular expression to match the function_call JSON structure
     pattern = re.compile(
-        r'\{"function_call":\s*\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{.*?\})\s*\}\}',
+        r'\{"function_call":\s*\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"(?:arguments|parameters)"\s*:\s*(\{.*?\})\s*\}\}',
         re.DOTALL
     )
     
@@ -46,27 +46,6 @@ def extract_function_calls(text: str) -> List[Dict]:
             continue  # Skip invalid JSON structures
 
     return function_calls
-
-def process_text_chunks(chunks: List[str]) -> List[Dict]:
-    """
-    Processes a list of text chunks to extract all function call requests.
-
-    Args:
-        chunks (List[str]): The list of text chunks to process.
-
-    Returns:
-        List[Dict]: A combined list of all function calls found.
-    """
-    all_function_calls = []
-    for index, chunk in enumerate(chunks):
-        print(f"Processing chunk {index + 1}/{len(chunks)}...")
-        calls = extract_function_calls(chunk)
-        if calls:
-            print(f"  Found {len(calls)} function call(s).")
-            all_function_calls.extend(calls)
-        else:
-            print("  No function calls found.")
-    return all_function_calls
 
 ## =====================================-------------------=====================================
 ## ------------------------------------- CLASS DEFINITIONS -------------------------------------
