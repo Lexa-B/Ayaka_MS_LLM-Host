@@ -38,9 +38,15 @@ class LoggingMiddleware(BaseHTTPMiddleware):
             body = await request.body()
             try:
                 body_str = body.decode('utf-8')
-                DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Request Body:", body_str)
+                # Parse the JSON string back into a Python object
+                body_obj = json.loads(body_str)
+                # Convert back to JSON with ensure_ascii=False to preserve unicode
+                pretty_body = json.dumps(body_obj, ensure_ascii=False, indent=2)
+                DramaticLogger["Dramatic"]["debug"]("[LLM-Host] Request Body:", pretty_body)
             except UnicodeDecodeError:
                 DramaticLogger["Dramatic"]["warning"]("[LLM-Host] Could not decode request body.")
+            except json.JSONDecodeError:
+                DramaticLogger["Dramatic"]["warning"]("[LLM-Host] Could not parse request body as JSON.")
             
             # Reassign the body so downstream can read it
             async def receive():
