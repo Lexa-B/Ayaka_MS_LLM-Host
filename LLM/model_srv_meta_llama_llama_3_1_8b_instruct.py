@@ -2,6 +2,8 @@
 
 from LLM._base_model_handler import BaseModelHandler
 from dramatic_logger import DramaticLogger
+from datetime import datetime
+from typing import List, Dict
 
 MODEL_PATH = "./LLM/meta-llama/Llama-3.1-8B-Instruct"
 
@@ -12,6 +14,18 @@ class ModelHandler(BaseModelHandler):
 
     def build_model_path(self) -> str:
         return MODEL_PATH
+
+    def apply_chat_template(self, messages: List[Dict[str, str]]):
+        # Get current date in the format "DD MMM YYYY"
+        current_date = datetime.now().strftime("%d %b %Y")
+        
+        # Apply chat template with current date
+        return self.tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            return_tensors="pt",
+            date_string=current_date  # Use current date instead of hardcoded "26 Jul 2024"
+        )
 
     def load_model(self):
         super().load_model()
