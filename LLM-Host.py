@@ -119,6 +119,13 @@ class LLMResponse(BaseModel):
 class Message_Basic(BaseModel):
     role: str
     content: str
+    ## This is a custom field that is not part of the OpenAI API spec.
+    ## It is used to indicate that the message in the ChatAyaka API needs to modify the tokenizer template and strip the response marker.
+    add_response_marker: Optional[bool] = None 
+    
+    # Allow additional fields
+    class Config:
+        extra = "allow"
 
 class Message_ToolCall(BaseModel):
     role: str
