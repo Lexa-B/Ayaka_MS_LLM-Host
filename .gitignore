@@ -12,6 +12,7 @@ LLM/*/
 DLog*.zip
 DLog.*zip
 DLog.*.log.zip
+DLogging/*
 
 # Docker
 *.dockerignore
